@@ -77,29 +77,11 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         pure
         returns (bytes32 pairHash)
     {
-        assembly {
-            mstore(0x00, outcomeTokenA)
-            mstore(0x20, outcomeIdA)
-            mstore(0x40, outcomeTokenB)
-            mstore(0x60, outcomeIdB)
-            pairHash := keccak256(0x00, 0x80)
-        }
-
-        //TODO: remove this after thorough testing
-        require(
-            pairHash == keccak256(abi.encodePacked(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB)),
-            "Hash mismatch"
-        );
+        pairHash = keccak256(abi.encodePacked(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB));
     }
 
     function _hashTokenInfo(OppositeOutcomeTokensInfo memory tokenInfo) internal pure returns (bytes32 pairHash) {
-        assembly {
-            mstore(0x00, mload(tokenInfo))
-            mstore(0x20, mload(add(tokenInfo, 0x20)))
-            mstore(0x40, mload(add(tokenInfo, 0x40)))
-            mstore(0x60, mload(add(tokenInfo, 0x60)))
-            pairHash := keccak256(0x00, 0x80)
-        }
+        pairHash = keccak256(abi.encodePacked(tokenInfo.outcomeTokenA, tokenInfo.outcomeIdA, tokenInfo.outcomeTokenB, tokenInfo.outcomeIdB));
     }
 
     function earlyExit(
@@ -183,11 +165,14 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         int256 profitOrLoss;
 
         if(amount > totalExited) {
+            // forge-lint: disable-next-line(unsafe-typecast)
             profitOrLoss = int256(amount - totalExited);
         } else {
+            // forge-lint: disable-next-line(unsafe-typecast)
             profitOrLoss = -int256(totalExited - amount);
         }
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _totalAssets = uint256(int256(_totalAssets) + profitOrLoss);
 
         delete totalEarlyExitedAmounts[pairHash];
