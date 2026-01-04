@@ -3,12 +3,13 @@ pragma solidity ^0.8.20;
 
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
 
 /**
  * @title EarlyExitAmount
  * @dev Contract that calculates the exit amount for opposite outcome token pairs
  */
-contract EarlyExitAmountBasedOnFixedAPY {
+contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
     uint256 public immutable MARKET_EXPIRY_TIME;
     uint256 public immutable EXPECTED_APY; // expressed in basis points, e.g., 500 = 5%
 

@@ -56,6 +56,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     error DirectTransfersNotAllowed();
     error BatchTransfersNotAllowed();
 
+    event UnderlyingVaultChanged(address indexed oldVault, address indexed newVault);
     event NewOppositeOutcomeTokenPairAdded(
         uint256 indexed outcomeIdA,
         uint256 indexed outcomeIdB,
@@ -104,6 +105,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         asset_.forceApprove(address(_vault), type(uint256).max);
 
         ASSET_DECIMALS = ERC20(address(asset_)).decimals();
+        emit UnderlyingVaultChanged(address(0), address(_vault));
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
@@ -125,14 +127,6 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         returns (bytes32 pairHash)
     {
         pairHash = keccak256(abi.encodePacked(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB));
-    }
-
-    function _hashTokenInfo(OppositeOutcomeTokens memory tokenInfo) internal pure returns (bytes32 pairHash) {
-        pairHash = keccak256(
-            abi.encodePacked(
-                tokenInfo.outcomeTokenA, tokenInfo.outcomeIdA, tokenInfo.outcomeTokenB, tokenInfo.outcomeIdB
-            )
-        );
     }
 
     function convertFromAssetsToOutcomeTokenAmount(uint256 assets, uint8 outcomeTokenDecimals, bool shouldRoundUp)
@@ -377,6 +371,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
         // take away approval from the old vault
         IERC20(asset()).forceApprove(address(oldVault), 0);
+
+        emit UnderlyingVaultChanged(address(oldVault), address(newVault));
     }
 
     function checkIsAllowedOppositeOutcomeTokenPair(
