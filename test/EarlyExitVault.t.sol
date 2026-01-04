@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {EarlyExitVault} from "src/EarlyExitVault.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockERC4626} from "test/mocks/MockERC4626.sol";
@@ -52,6 +53,7 @@ contract EarlyExitVaultTest is Test {
         assertEq(address(vault.asset()), address(asset));
         assertEq(address(vault.vault()), address(underlyingVault));
         assertEq(vault.owner(), owner);
+        assertEq(vault.ASSET_DECIMALS(), 6);
     }
 
     function testDeposit() public {
@@ -75,14 +77,14 @@ contract EarlyExitVaultTest is Test {
 
     function testAddAllowedOppositeOutcomeTokens() public {
         vm.startPrank(owner);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         assertTrue(vault.checkIsAllowedOppositeOutcomeTokenPair(tokenA, outcomeIdA, tokenB, outcomeIdB));
         vm.stopPrank();
     }
 
     function testEarlyExit() public {
         vm.startPrank(owner);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         vm.stopPrank();
 
         vm.startPrank(user);
@@ -98,26 +100,27 @@ contract EarlyExitVaultTest is Test {
 
     function testRemoveAllowedOppositeOutcomeTokens() public {
         vm.startPrank(owner);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
-        vault.removeAllowedOppositeOutcomeTokens(0);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vault.removeAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB);
         assertFalse(vault.checkIsAllowedOppositeOutcomeTokenPair(tokenA, outcomeIdA, tokenB, outcomeIdB));
         vm.stopPrank();
     }
 
     function testTransferTokensToAdmin() public {
         vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         // Set balance directly to avoid onERC1155Received check
         bytes32 idHash = keccak256(abi.encode(outcomeIdA, uint256(0)));
         bytes32 balanceSlot = keccak256(abi.encode(address(vault), idHash));
         vm.store(address(tokenA), balanceSlot, bytes32(uint256(100)));
-        vault.transferTokensToAdmin(tokenA, outcomeIdA);
+        vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB);
         assertEq(tokenA.balanceOf(owner, outcomeIdA), 100);
         vm.stopPrank();
     }
 
     function testReportProfitOrLoss() public {
         vm.startPrank(owner);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         vm.stopPrank();
 
         vm.startPrank(user);
@@ -125,10 +128,11 @@ contract EarlyExitVaultTest is Test {
         tokenB.setApprovalForAll(address(vault), true);
         asset.approve(address(vault), 1000);
         vault.deposit(1000, user);
-        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // sets totalEarlyExitedAmounts to 100
+        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // sets earlyExitedAmount to 100
         vm.stopPrank();
 
         vm.startPrank(owner);
+        vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB); // pause the pair
         asset.approve(address(vault), 50); // report 50, which is less than 100, so loss
         vault.reportProfitOrLoss(tokenA, outcomeIdA, tokenB, outcomeIdB, 50);
         vm.stopPrank();
@@ -136,9 +140,9 @@ contract EarlyExitVaultTest is Test {
 
     function testAddAllowedOppositeOutcomeTokensAlreadyAllowed() public {
         vm.startPrank(owner);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         vm.expectRevert(EarlyExitVault.PairAlreadyAllowed.selector);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         vm.stopPrank();
     }
 
@@ -156,8 +160,8 @@ contract EarlyExitVaultTest is Test {
 
     function testRemoveAllowedOppositeOutcomeTokensInvalidIndex() public {
         vm.startPrank(owner);
-        vm.expectRevert("Index out of bounds");
-        vault.removeAllowedOppositeOutcomeTokens(0); // no pairs added
+        vm.expectRevert("Pair not allowed");
+        vault.removeAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB); // no pairs added
         vm.stopPrank();
     }
 
@@ -174,5 +178,13 @@ contract EarlyExitVaultTest is Test {
     function testOnERC1155BatchReceived() public {
         vm.expectRevert(EarlyExitVault.BatchTransfersNotAllowed.selector);
         vault.onERC1155BatchReceived(address(0), address(0), new uint256[](0), new uint256[](0), "");
+    }
+
+    function testChangeUnderlyingVault() public {
+        MockERC4626 newVault = new MockERC4626(asset);
+        vm.startPrank(owner);
+        vault.changeUnderlyingVault(IERC4626(address(newVault)));
+        vm.stopPrank();
+        assertEq(address(vault.asset()), address(asset));
     }
 }
