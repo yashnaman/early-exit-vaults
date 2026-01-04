@@ -107,6 +107,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         totalEarlyExitedAmounts[pairHash] += exitAmount;
     }
 
+    // the owner needs to make sure that the decimals of the outcome tokens are the same as the asset decimals
+    // for ERC1155 tokens, the data is in the URI, so there is no way to enforce this on-chain
     function addAllowedOppositeOutcomeTokens(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
@@ -149,6 +151,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
     // this can be automated using a contract
     // right this is done manually by the owner after market expiry
+    // owner takes 10% of the profit as fee (can be enforced on-chain by making all the manual process that owner does on-chain)
     function reportProfitOrLoss(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
