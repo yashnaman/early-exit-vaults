@@ -253,4 +253,32 @@ contract EarlyExitVaultTest is Test {
         // The mock earlyExitAmountContract returns the amount * 1, so 100
         assertEq(estimated, 100);
     }
+
+    function testSplitOppositeOutcomeTokens() public {
+        vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        tokenA.setApprovalForAll(address(vault), true);
+        tokenB.setApprovalForAll(address(vault), true);
+        asset.approve(address(vault), 1000);
+        vault.deposit(1000, user);
+        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // transfers outcome tokens to vault
+        vm.stopPrank();
+
+        // Now split: provide assets back, get outcome tokens
+        vm.startPrank(user);
+        asset.approve(address(vault), 50); // split 50
+        vault.splitOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, 50, user);
+        vm.stopPrank();
+
+        // Check that earlyExitedAmount decreased
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
+        (, , , , , uint256 earlyExitedAmount) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
+        assertEq(earlyExitedAmount, 50); // 100 - 50
+
+        // Check totalEarlyExitedAmount
+        assertEq(vault.totalEarlyExitedAmount(), 50);
+    }
 }
