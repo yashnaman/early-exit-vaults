@@ -177,14 +177,14 @@ contract EarlyExitVaultTest is Test {
         asset.approve(address(vault), 1000);
         vault.deposit(1000, user);
 
-        vm.expectRevert("Not an allowed opposite outcome token pair");
+        vm.expectRevert(EarlyExitVault.PairNotAllowed.selector);
         vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user);
         vm.stopPrank();
     }
 
     function testRemoveAllowedOppositeOutcomeTokensInvalidIndex() public {
         vm.startPrank(owner);
-        vm.expectRevert("Pair not allowed");
+        vm.expectRevert(EarlyExitVault.PairNotAllowed.selector);
         vault.removeAllowedOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB); // no pairs added
         vm.stopPrank();
     }
@@ -280,5 +280,20 @@ contract EarlyExitVaultTest is Test {
 
         // Check totalEarlyExitedAmount
         assertEq(vault.totalEarlyExitedAmount(), 50);
+    }
+
+    function testGetOppositeOutcomeTokenPairs() public {
+        vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA + 1, tokenB, 6, outcomeIdB + 1, earlyExitAmountContract);
+        vm.stopPrank();
+
+        // Get pairs from index 0 to 1
+        EarlyExitVault.OppositeOutcomeTokens[] memory pairs = vault.getOppositeOutcomeTokenPairs(0, 1);
+        assertEq(pairs.length, 2);
+        assertEq(address(pairs[0].outcomeTokenA), address(tokenA));
+        assertEq(pairs[0].outcomeIdA, outcomeIdA);
+        assertEq(address(pairs[1].outcomeTokenA), address(tokenA));
+        assertEq(pairs[1].outcomeIdA, outcomeIdA + 1);
     }
 }

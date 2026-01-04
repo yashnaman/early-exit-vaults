@@ -55,6 +55,13 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     error PairAlreadyAllowed();
     error DirectTransfersNotAllowed();
     error BatchTransfersNotAllowed();
+    error PairNotAllowed();
+    error TransfersPaused();
+    error CannotRemoveWithPendingAmount();
+    error CannotRemoveWhilePaused();
+    error NotPaused();
+    error InvalidRange();
+    error EndIndexOutOfBounds();
 
     event UnderlyingVaultChanged(address indexed oldVault, address indexed newVault);
     event NewOppositeOutcomeTokenPairAdded(
@@ -162,8 +169,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
 
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Not an allowed opposite outcome token pair");
-        require(!info.isPaused, "Transfers are paused for this pair");
+        require(info.isAllowed, PairNotAllowed());
+        require(!info.isPaused, TransfersPaused());
 
         // Transfer outcome tokens from the caller to this contract
         outcomeTokenA.safeTransferFrom(
@@ -205,8 +212,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
 
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Not an allowed opposite outcome token pair");
-        require(!info.isPaused, "Transfers are paused for this pair");
+        require(info.isAllowed, PairNotAllowed());
+        require(!info.isPaused, TransfersPaused());
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         vault.deposit(amount, address(this));
@@ -278,9 +285,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     ) public onlyOwner {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Pair not allowed");
-        require(info.earlyExitedAmount == 0, "Cannot remove pair with pending exited amount");
-        require(!info.isPaused, "Cannot remove pair while paused");
+        require(info.isAllowed, PairNotAllowed());
+        require(info.earlyExitedAmount == 0, CannotRemoveWithPendingAmount());
+        require(!info.isPaused, CannotRemoveWhilePaused());
 
         delete allowedOppositeOutcomeTokensInfo[pairHash];
 
@@ -295,8 +302,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Pair not allowed");
-        require(!info.isPaused, "Transfers are paused for this pair");
+        require(info.isAllowed, PairNotAllowed());
+        require(!info.isPaused, TransfersPaused());
         info.isPaused = true;
 
         outcomeTokenA.safeTransferFrom(
@@ -322,8 +329,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     ) public onlyOwner {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Pair not allowed");
-        require(info.isPaused, "Not paused");
+        require(info.isAllowed, PairNotAllowed());
+        require(info.isPaused, NotPaused());
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         vault.deposit(amount, address(this));
@@ -398,12 +405,30 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
 
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
-        require(info.isAllowed, "Not an allowed opposite outcome token pair");
+        require(info.isAllowed, PairNotAllowed());
 
         uint256 exitAmount = info.earlyExitAmountContract
         .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
 
         return exitAmount;
+    }
+
+    function getOppositeOutcomeTokenPairs(uint256 start, uint256 end)
+        external
+        view
+        returns (OppositeOutcomeTokens[] memory)
+    {
+        require(start <= end, InvalidRange());
+        require(end < oppositeOutcomeTokenPairs.length, EndIndexOutOfBounds());
+
+        uint256 length = end - start + 1;
+        OppositeOutcomeTokens[] memory result = new OppositeOutcomeTokens[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            result[i] = oppositeOutcomeTokenPairs[start + i];
+        }
+
+        return result;
     }
 
     function totalAssets() public view override returns (uint256) {
