@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {EarlyExitVault} from "src/EarlyExitVault.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {EarlyExitAmountFactoryBasedOnFixedAPY} from "src/EarlyExitAmount.sol";
 
 contract DeployEarlyExitVault is Script {
     function run() external {
@@ -21,10 +22,13 @@ contract DeployEarlyExitVault is Script {
         IERC4626 underlyingVault = IERC4626(underlyingVaultAddress);
 
         EarlyExitVault earlyExitVault = new EarlyExitVault(asset, underlyingVault, vaultName, vaultSymbol);
+        EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory =
+            new EarlyExitAmountFactoryBasedOnFixedAPY();
 
         vm.stopBroadcast();
 
-        // Log the deployed address
+        // Log the deployed addresses
         console.log("EarlyExitVault deployed at:", address(earlyExitVault));
+        console.log("EarlyExitAmountFactoryBasedOnFixedAPY deployed at:", address(earlyExitAmountFactory));
     }
 }
