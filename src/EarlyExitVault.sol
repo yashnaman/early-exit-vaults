@@ -86,6 +86,13 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 amount,
         uint256 exitAmount
     );
+    event SplitOppositeOutcomeTokens(
+        uint256 indexed outcomeIdA,
+        uint256 indexed outcomeIdB,
+        IERC1155 outcomeTokenA,
+        IERC1155 outcomeTokenB,
+        uint256 amount
+    );
 
     constructor(IERC20 asset_, IERC4626 _vault, string memory name_, string memory symbol_)
         ERC4626(asset_)
@@ -128,14 +135,18 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         );
     }
 
-    function convertFromAssetsToOutcomeTokenAmount(uint256 assets, uint8 outcomeTokenDecimals)
+    function convertFromAssetsToOutcomeTokenAmount(uint256 assets, uint8 outcomeTokenDecimals, bool shouldRoundUp)
         public
         view
         returns (uint256)
     {
         if (ASSET_DECIMALS >= outcomeTokenDecimals) {
             // round up in favor of the protocol
-            return Math.ceilDiv(assets, 10 ** (ASSET_DECIMALS - outcomeTokenDecimals));
+            if (shouldRoundUp) {
+                return Math.ceilDiv(assets, 10 ** (ASSET_DECIMALS - outcomeTokenDecimals));
+            } else {
+                return assets / (10 ** (ASSET_DECIMALS - outcomeTokenDecimals));
+            }
         } else {
             return assets * (10 ** (outcomeTokenDecimals - ASSET_DECIMALS));
         }
@@ -143,6 +154,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
     // here the amount will be in the asset decimals
     // we will convert it into the outcome token decimals using the owner provided decimals while adding the pair
+
+    // @arbitragers provide opposite outcome tokens and get underlying assets back immediately
+    // there is no need to trust the owner of this contract at all. 
     function earlyExit(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
@@ -150,7 +164,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdB,
         uint256 amount, //amount in assets decimals
         address to
-    ) external {
+    ) external returns (uint256 exitAmount) {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
 
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
@@ -159,13 +173,13 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
         // Transfer outcome tokens from the caller to this contract
         outcomeTokenA.safeTransferFrom(
-            msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA), ""
+            msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA, true), ""
         );
         outcomeTokenB.safeTransferFrom(
-            msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB), ""
+            msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB, true), ""
         );
 
-        uint256 exitAmount = info.earlyExitAmountContract
+        exitAmount = info.earlyExitAmountContract
         .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
 
         vault.withdraw(exitAmount, to, address(this));
@@ -173,6 +187,47 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         totalEarlyExitedAmount += exitAmount;
 
         emit EarlyExit(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB, amount, exitAmount);
+    }
+
+    // provide the underlying assets and get the opposite outcome tokens back 
+    // for example, you can provide 1 USDC and get back 1 YES outcome token of will trump win on Opinion and 1 NO token of will trump win on Opinion
+    // this contract will only have the outcome tokens to be split if some arbitager has done an early exit before 
+    function splitOppositeOutcomeTokens(
+        IERC1155 outcomeTokenA,
+        uint256 outcomeIdA,
+        IERC1155 outcomeTokenB,
+        uint256 outcomeIdB,
+        uint256 amount, // amount in asset decimals
+        address to
+    ) external {
+        bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
+
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Not an allowed opposite outcome token pair");
+        require(!info.isPaused, "Transfers are paused for this pair");
+
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
+        vault.deposit(amount, address(this));
+
+        // Decrease the tracked early exit amounts to reflect the split operation.
+        // During early exits, outcome tokens are acquired at a discount (less than 1:1 ratio).
+        // This split operation converts them back to underlying assets at full value (1:1 ratio).
+        // The profit from this action will not be reported when the owner calls reportProfitOrLoss.
+        totalEarlyExitedAmount = totalEarlyExitedAmount > amount ? totalEarlyExitedAmount - amount : 0;
+        info.earlyExitedAmount = info.earlyExitedAmount > amount ? info.earlyExitedAmount - amount : 0;
+
+        // Transfer opposite outcome tokens to the caller
+        outcomeTokenA.safeTransferFrom(
+            address(this), to, outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA, false), ""
+        );
+        outcomeTokenB.safeTransferFrom(
+            address(this), to, outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB, false), ""
+        );
+
+        // Note: The profit from this split operation cannot be accurately calculated on-chain.
+        // To track profitability, monitor off-chain: compare the average discount rate from early exits
+        // against the 1:1 redemption rate used here. The difference represents the realized profit.
+        emit SplitOppositeOutcomeTokens(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB, amount);
     }
 
     // the owner needs to make sure that the decimals of the outcome tokens are the same as the asset decimals
@@ -255,6 +310,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     // this can be automated using a contract
     // right this is done manually by the owner after market expiry
     // owner takes 10% of the profit as fee (can be enforced on-chain by making all the manual process that owner does on-chain)
+    // next version will rely on the owner very less. For now, we keep it simple
     function reportProfitOrLoss(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
@@ -324,6 +380,26 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         return
             allowedOppositeOutcomeTokensInfo[pairHash].isAllowed && !allowedOppositeOutcomeTokensInfo[pairHash].isPaused;
+    }
+
+    // estimate how much underlying assets you will get back if you do an early exit
+    // likely to be near 1:1 ratio minus some small discount
+    function estimateEarlyExitAmount(
+        IERC1155 outcomeTokenA,
+        uint256 outcomeIdA,
+        IERC1155 outcomeTokenB,
+        uint256 outcomeIdB,
+        uint256 amount
+    ) external view returns (uint256) {
+        bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
+
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Not an allowed opposite outcome token pair");
+
+        uint256 exitAmount = info.earlyExitAmountContract
+        .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
+
+        return exitAmount;
     }
 
     function totalAssets() public view override returns (uint256) {

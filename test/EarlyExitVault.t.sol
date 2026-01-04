@@ -138,6 +138,30 @@ contract EarlyExitVaultTest is Test {
         vm.stopPrank();
     }
 
+    function testReportProfitOrLossAndRemovePair() public {
+        vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        tokenA.setApprovalForAll(address(vault), true);
+        tokenB.setApprovalForAll(address(vault), true);
+        asset.approve(address(vault), 1000);
+        vault.deposit(1000, user);
+        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // sets earlyExitedAmount to 100
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB); // pause the pair
+        asset.approve(address(vault), 50); // report 50, which is less than 100, so loss
+        vault.reportProfitOrLossAndRemovePair(tokenA, outcomeIdA, tokenB, outcomeIdB, 50);
+        vm.stopPrank();
+
+        // Check that the pair is removed
+        bool isAllowed = vault.checkIsAllowedOppositeOutcomeTokenPair(tokenA, outcomeIdA, tokenB, outcomeIdB);
+        assertFalse(isAllowed);
+    }
+
     function testAddAllowedOppositeOutcomeTokensAlreadyAllowed() public {
         vm.startPrank(owner);
         vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
@@ -186,5 +210,47 @@ contract EarlyExitVaultTest is Test {
         vault.changeUnderlyingVault(IERC4626(address(newVault)));
         vm.stopPrank();
         assertEq(address(vault.asset()), address(asset));
+    }
+
+    function testConvertFromAssetsToOutcomeTokenAmount() public view {
+        // Test conversion with same decimals (6)
+        uint256 amount = vault.convertFromAssetsToOutcomeTokenAmount(1000000, 6, false); // 1 USDC = 1 outcome token
+        assertEq(amount, 1000000);
+
+        // Test conversion with different decimals (18)
+        amount = vault.convertFromAssetsToOutcomeTokenAmount(1000000, 18, false); // 1 USDC = 10^12 outcome tokens
+        assertEq(amount, 1000000000000000000);
+
+        // Test with round up (but since it's multiplication, no rounding)
+        amount = vault.convertFromAssetsToOutcomeTokenAmount(1, 18, true); // 1 wei = 10^12 outcome tokens
+        assertEq(amount, 1000000000000);
+
+        // Test division with rounding
+        amount = vault.convertFromAssetsToOutcomeTokenAmount(1, 0, false); // 1 USDC = 0 outcome tokens (truncated)
+        assertEq(amount, 0);
+
+        amount = vault.convertFromAssetsToOutcomeTokenAmount(1, 0, true); // round up to 1
+        assertEq(amount, 1);
+    }
+
+    function testStartRedeemProcess() public {
+        vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB);
+        vm.stopPrank();
+
+        // Check that the pair is paused
+        bool isAllowed = vault.checkIsAllowedOppositeOutcomeTokenPair(tokenA, outcomeIdA, tokenB, outcomeIdB);
+        assertFalse(isAllowed);
+    }
+
+    function testEstimateEarlyExitAmount() public {
+        vm.startPrank(owner);
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vm.stopPrank();
+
+        uint256 estimated = vault.estimateEarlyExitAmount(tokenA, outcomeIdA, tokenB, outcomeIdB, 100);
+        // The mock earlyExitAmountContract returns the amount * 1, so 100
+        assertEq(estimated, 100);
     }
 }
