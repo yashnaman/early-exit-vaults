@@ -230,14 +230,12 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         emit OppositeOutcomeTokenPairRemoved(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB);
     }
 
-    // make sure the owner does this only after the corresponding market has expired
+    // make sure the owner does this only after the corresponding markets have expired
     // right now it is upto the owner to verify that the market has expired
-    function startRedeemProcess(
-        IERC1155 outcomeTokenA,
-        uint256 outcomeIdA,
-        IERC1155 outcomeTokenB,
-        uint256 outcomeIdB
-    ) external onlyOwner {
+    function startRedeemProcess(IERC1155 outcomeTokenA, uint256 outcomeIdA, IERC1155 outcomeTokenB, uint256 outcomeIdB)
+        external
+        onlyOwner
+    {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
         require(info.isAllowed, "Pair not allowed");
@@ -300,6 +298,21 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     ) external onlyOwner {
         reportProfitOrLoss(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
         removeAllowedOppositeOutcomeTokens(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
+    }
+
+    function changeUnderlyingVault(IERC4626 newVault) external onlyOwner {
+        IERC4626 oldVault = IERC4626(address(vault));
+
+        require(newVault.asset() == asset(), VaultAssetMismatch());
+        vault = newVault;
+
+        uint256 assetsReceived = oldVault.redeem(oldVault.balanceOf(address(this)), address(this), address(this));
+        IERC20(asset()).forceApprove(address(newVault), type(uint256).max);
+
+        newVault.deposit(assetsReceived, address(this));
+
+        // take away approval from the old vault
+        IERC20(asset()).forceApprove(address(oldVault), 0);
     }
 
     function checkIsAllowedOppositeOutcomeTokenPair(
