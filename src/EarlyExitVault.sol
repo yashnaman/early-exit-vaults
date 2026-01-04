@@ -156,7 +156,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     // we will convert it into the outcome token decimals using the owner provided decimals while adding the pair
 
     // @arbitragers provide opposite outcome tokens and get underlying assets back immediately
-    // there is no need to trust the owner of this contract at all. 
+    // there is no need to trust the owner of this contract at all.
     function earlyExit(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
@@ -173,14 +173,22 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
         // Transfer outcome tokens from the caller to this contract
         outcomeTokenA.safeTransferFrom(
-            msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA, true), ""
+            msg.sender,
+            address(this),
+            outcomeIdA,
+            convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA, true),
+            ""
         );
         outcomeTokenB.safeTransferFrom(
-            msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB, true), ""
+            msg.sender,
+            address(this),
+            outcomeIdB,
+            convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB, true),
+            ""
         );
 
         exitAmount = info.earlyExitAmountContract
-        .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
+            .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
 
         vault.withdraw(exitAmount, to, address(this));
         info.earlyExitedAmount += exitAmount;
@@ -189,9 +197,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         emit EarlyExit(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB, amount, exitAmount);
     }
 
-    // provide the underlying assets and get the opposite outcome tokens back 
+    // provide the underlying assets and get the opposite outcome tokens back
     // for example, you can provide 1 USDC and get back 1 YES outcome token of will trump win on Opinion and 1 NO token of will trump win on Opinion
-    // this contract will only have the outcome tokens to be split if some arbitager has done an early exit before 
+    // this contract will only have the outcome tokens to be split if some arbitager has done an early exit before
     function splitOppositeOutcomeTokens(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,

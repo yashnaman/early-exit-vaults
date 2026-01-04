@@ -275,7 +275,7 @@ contract EarlyExitVaultTest is Test {
 
         // Check that earlyExitedAmount decreased
         bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
-        (, , , , , uint256 earlyExitedAmount) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
+        (,,,,, uint256 earlyExitedAmount) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
         assertEq(earlyExitedAmount, 50); // 100 - 50
 
         // Check totalEarlyExitedAmount
