@@ -24,11 +24,11 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     using SafeERC20 for IERC20;
 
-    uint256 internal _totalAssets;
+    uint256 public totalEarlyExitedAmount;
 
     // vault where the underlying assets are deposited when it is not being used for early exits
     IERC4626 public vault;
-    uint256 public immutable assetDecimals;
+    uint256 public immutable ASSET_DECIMALS;
 
     // vault depositors will trust the admin of the vault to set these such that only opposite outcome tokens are allowed
     // one of the outcome should be guaranteed to be worth 1 when the market expires
@@ -45,7 +45,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint8 decimalsA;
         uint8 decimalsB;
         IGetEarlyExitAmount earlyExitAmountContract;
-        uint256 totalEarlyExitedAmount;
+        uint256 earlyExitedAmount;
     }
 
     OppositeOutcomeTokens[] public oppositeOutcomeTokenPairs;
@@ -56,6 +56,37 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     error DirectTransfersNotAllowed();
     error BatchTransfersNotAllowed();
 
+    event NewOppositeOutcomeTokenPairAdded(
+        uint256 indexed outcomeIdA,
+        uint256 indexed outcomeIdB,
+        IGetEarlyExitAmount indexed earlyExitAmountContract,
+        IERC1155 outcomeTokenA,
+        IERC1155 outcomeTokenB,
+        uint8 decimalsA,
+        uint8 decimalsB
+    );
+    event OppositeOutcomeTokenPairRemoved(
+        uint256 indexed outcomeIdA, uint256 indexed outcomeIdB, IERC1155 outcomeTokenA, IERC1155 outcomeTokenB
+    );
+    event OppositeOutcomeTokenPairPaused(
+        uint256 indexed outcomeIdA, uint256 indexed outcomeIdB, IERC1155 outcomeTokenA, IERC1155 outcomeTokenB
+    );
+    event ProfitOrLossReported(
+        uint256 indexed outcomeIdA,
+        uint256 indexed outcomeIdB,
+        IERC1155 outcomeTokenA,
+        IERC1155 outcomeTokenB,
+        int256 profitOrLoss
+    );
+    event EarlyExit(
+        uint256 indexed outcomeIdA,
+        uint256 indexed outcomeIdB,
+        IERC1155 outcomeTokenA,
+        IERC1155 outcomeTokenB,
+        uint256 amount,
+        uint256 exitAmount
+    );
+
     constructor(IERC20 asset_, IERC4626 _vault, string memory name_, string memory symbol_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
@@ -65,13 +96,12 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         if (_vault.asset() != address(asset_)) revert VaultAssetMismatch();
         asset_.forceApprove(address(_vault), type(uint256).max);
 
-        assetDecimals = ERC20(address(asset_)).decimals();
+        ASSET_DECIMALS = ERC20(address(asset_)).decimals();
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
         super._deposit(caller, receiver, assets, shares);
         vault.deposit(assets, address(this));
-        _totalAssets += assets;
     }
 
     function _withdraw(address caller, address receiver, address owner, uint256 assets, uint256 shares)
@@ -80,7 +110,6 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     {
         vault.withdraw(assets, address(this), address(this));
         super._withdraw(caller, receiver, owner, assets, shares);
-        _totalAssets -= assets;
     }
 
     function _hashTokenPair(IERC1155 outcomeTokenA, uint256 outcomeIdA, IERC1155 outcomeTokenB, uint256 outcomeIdB)
@@ -99,15 +128,16 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         );
     }
 
-    function convertFromAssetsToOutcomeTokenAmount(
-        uint256 assets,
-        uint8 outcomeTokenDecimals
-    ) public view returns (uint256) {
-        if(assetDecimals >= outcomeTokenDecimals) {
+    function convertFromAssetsToOutcomeTokenAmount(uint256 assets, uint8 outcomeTokenDecimals)
+        public
+        view
+        returns (uint256)
+    {
+        if (ASSET_DECIMALS >= outcomeTokenDecimals) {
             // round up in favor of the protocol
-            return Math.ceilDiv(assets, 10**(assetDecimals - outcomeTokenDecimals));
+            return Math.ceilDiv(assets, 10 ** (ASSET_DECIMALS - outcomeTokenDecimals));
         } else {
-            return assets * (10**(outcomeTokenDecimals - assetDecimals));
+            return assets * (10 ** (outcomeTokenDecimals - ASSET_DECIMALS));
         }
     }
 
@@ -118,7 +148,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdA,
         IERC1155 outcomeTokenB,
         uint256 outcomeIdB,
-        uint256 amount, //amount in assets decimals 
+        uint256 amount, //amount in assets decimals
         address to
     ) external {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
@@ -128,14 +158,21 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         require(!info.isPaused, "Transfers are paused for this pair");
 
         // Transfer outcome tokens from the caller to this contract
-        outcomeTokenA.safeTransferFrom(msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA), "");
-        outcomeTokenB.safeTransferFrom(msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB), "");
+        outcomeTokenA.safeTransferFrom(
+            msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA), ""
+        );
+        outcomeTokenB.safeTransferFrom(
+            msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB), ""
+        );
 
         uint256 exitAmount = info.earlyExitAmountContract
         .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
 
         vault.withdraw(exitAmount, to, address(this));
-        info.totalEarlyExitedAmount += exitAmount;
+        info.earlyExitedAmount += exitAmount;
+        totalEarlyExitedAmount += exitAmount;
+
+        emit EarlyExit(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB, amount, exitAmount);
     }
 
     // the owner needs to make sure that the decimals of the outcome tokens are the same as the asset decimals
@@ -159,7 +196,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
             decimalsA: decimalsA,
             decimalsB: decimalsB,
             earlyExitAmountContract: earlyExitAmountContract,
-            totalEarlyExitedAmount: 0
+            earlyExitedAmount: 0
         });
 
         oppositeOutcomeTokenPairs.push(
@@ -169,6 +206,10 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
                 outcomeTokenB: outcomeTokenB,
                 outcomeIdB: outcomeIdB
             })
+        );
+
+        emit NewOppositeOutcomeTokenPairAdded(
+            outcomeIdA, outcomeIdB, earlyExitAmountContract, outcomeTokenA, outcomeTokenB, decimalsA, decimalsB
         );
     }
 
@@ -181,15 +222,17 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
         require(info.isAllowed, "Pair not allowed");
-        require(info.totalEarlyExitedAmount == 0, "Cannot remove pair with pending exited amount");
+        require(info.earlyExitedAmount == 0, "Cannot remove pair with pending exited amount");
         require(!info.isPaused, "Cannot remove pair while paused");
 
         delete allowedOppositeOutcomeTokensInfo[pairHash];
+
+        emit OppositeOutcomeTokenPairRemoved(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB);
     }
 
     // make sure the owner does this only after the corresponding market has expired
     // right now it is upto the owner to verify that the market has expired
-    function transferTokensToAdmin(
+    function startRedeemProcess(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
         IERC1155 outcomeTokenB,
@@ -207,6 +250,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         outcomeTokenB.safeTransferFrom(
             address(this), msg.sender, outcomeIdB, outcomeTokenB.balanceOf(address(this), outcomeIdB), ""
         );
+
+        emit OppositeOutcomeTokenPairPaused(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB);
     }
 
     // this can be automated using a contract
@@ -224,26 +269,26 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         require(info.isAllowed, "Pair not allowed");
         require(info.isPaused, "Not paused");
 
-        uint256 totalExited = info.totalEarlyExitedAmount;
-
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         vault.deposit(amount, address(this));
 
-        int256 profitOrLoss;
+        // if there is a profit, the amount will be greater than the info.earlyExitedAmount
+        // if there is a loss, the amount will be less than the info.earlyExited
 
-        if (amount > totalExited) {
+        int256 profitOrLoss;
+        if (amount > info.earlyExitedAmount) {
             // forge-lint: disable-next-line(unsafe-typecast)
-            profitOrLoss = int256(amount - totalExited);
+            profitOrLoss = int256(amount - info.earlyExitedAmount);
         } else {
             // forge-lint: disable-next-line(unsafe-typecast)
-            profitOrLoss = -int256(totalExited - amount);
+            profitOrLoss = -int256(info.earlyExitedAmount - amount);
         }
 
-        // forge-lint: disable-next-line(unsafe-typecast)
-        _totalAssets = uint256(int256(_totalAssets) + profitOrLoss);
-
-        info.totalEarlyExitedAmount = 0;
+        totalEarlyExitedAmount -= info.earlyExitedAmount;
+        info.earlyExitedAmount = 0;
         info.isPaused = false;
+
+        emit ProfitOrLossReported(outcomeIdA, outcomeIdB, outcomeTokenA, outcomeTokenB, profitOrLoss);
     }
 
     function reportProfitOrLossAndRemovePair(
@@ -269,7 +314,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     }
 
     function totalAssets() public view override returns (uint256) {
-        return _totalAssets;
+        return totalEarlyExitedAmount + vault.previewRedeem(vault.balanceOf(address(this)));
     }
 
     function onERC1155Received(address operator, address, uint256, uint256, bytes calldata)
