@@ -115,6 +115,9 @@ contract EarlyExitVaultTest is Test {
         uint256 userTokenBBefore = tokenB.balanceOf(user, outcomeIdB);
         uint256 vaultTokenABefore = tokenA.balanceOf(address(vault), outcomeIdA);
         uint256 vaultTokenBBefore = tokenB.balanceOf(address(vault), outcomeIdB);
+        uint256 totalEarlyExitedBefore = vault.totalEarlyExitedAmount();
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
+        (,,,,, uint256 pairEarlyExitedBefore) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
 
         vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user);
 
@@ -129,6 +132,10 @@ contract EarlyExitVaultTest is Test {
         assertEq(asset.balanceOf(user), userAssetBefore + 100);
         // Total assets remain the same (early exited amount + vault assets)
         assertEq(vault.totalAssets(), totalAssetsBefore);
+        // Check early exited amounts increased
+        assertEq(vault.totalEarlyExitedAmount(), totalEarlyExitedBefore + 100);
+        (,,,,, uint256 pairEarlyExitedAfter) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
+        assertEq(pairEarlyExitedAfter, pairEarlyExitedBefore + 100);
         vm.stopPrank();
     }
 
@@ -167,8 +174,15 @@ contract EarlyExitVaultTest is Test {
 
         vm.startPrank(owner);
         vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB); // pause the pair
+        uint256 totalEarlyExitedBeforeReport = vault.totalEarlyExitedAmount();
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
+        
         asset.approve(address(vault), 50); // report 50, which is less than 100, so loss
         vault.reportProfitOrLoss(tokenA, outcomeIdA, tokenB, outcomeIdB, 50);
+        // Check early exited amounts reset to 0
+        assertEq(vault.totalEarlyExitedAmount(), totalEarlyExitedBeforeReport - 100);
+        (,,,,, uint256 pairEarlyExitedAfterReport) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
+        assertEq(pairEarlyExitedAfterReport, 0);
         vm.stopPrank();
     }
 
@@ -310,6 +324,9 @@ contract EarlyExitVaultTest is Test {
         uint256 userTokenBBeforeSplit = tokenB.balanceOf(user, outcomeIdB);
         uint256 vaultTokenABeforeSplit = tokenA.balanceOf(address(vault), outcomeIdA);
         uint256 vaultTokenBBeforeSplit = tokenB.balanceOf(address(vault), outcomeIdB);
+        uint256 totalEarlyExitedBeforeSplit = vault.totalEarlyExitedAmount();
+        bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
+        (,,,,, uint256 pairEarlyExitedBeforeSplit) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
 
         asset.approve(address(vault), 50); // split 50
         vault.splitOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, 50, user);
@@ -325,15 +342,11 @@ contract EarlyExitVaultTest is Test {
         // Vault loses outcome tokens
         assertEq(tokenA.balanceOf(address(vault), outcomeIdA), vaultTokenABeforeSplit - 50);
         assertEq(tokenB.balanceOf(address(vault), outcomeIdB), vaultTokenBBeforeSplit - 50);
+        // Check early exited amounts decreased
+        assertEq(vault.totalEarlyExitedAmount(), totalEarlyExitedBeforeSplit - 50);
+        (,,,,, uint256 pairEarlyExitedAfterSplit) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
+        assertEq(pairEarlyExitedAfterSplit, pairEarlyExitedBeforeSplit - 50);
         vm.stopPrank();
-
-        // Check that earlyExitedAmount decreased
-        bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
-        (,,,,, uint256 earlyExitedAmount) = vault.allowedOppositeOutcomeTokensInfo(pairHash);
-        assertEq(earlyExitedAmount, 50); // 100 - 50
-
-        // Check totalEarlyExitedAmount
-        assertEq(vault.totalEarlyExitedAmount(), 50);
     }
 
     function testGetOppositeOutcomeTokenPairs() public {
