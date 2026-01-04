@@ -12,6 +12,7 @@ import {IERC1155Receiver} from "@openzeppelin/contracts/interfaces/IERC1155Recei
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title EarlyExitVault
@@ -27,20 +28,28 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
     // vault where the underlying assets are deposited when it is not being used for early exits
     IERC4626 public vault;
+    uint256 public immutable assetDecimals;
 
     // vault depositors will trust the admin of the vault to set these such that only opposite outcome tokens are allowed
     // one of the outcome should be guaranteed to be worth 1 when the market expires
-    struct OppositeOutcomeTokensInfo {
+    struct OppositeOutcomeTokens {
         IERC1155 outcomeTokenA;
         uint256 outcomeIdA;
         IERC1155 outcomeTokenB;
         uint256 outcomeIdB;
     }
 
-    OppositeOutcomeTokensInfo[] public allowedOppositeOutcomeTokens;
-    mapping(bytes32 => bool) public isAllowedOppositeOutcomeTokenPair;
-    mapping(bytes32 => IGetEarlyExitAmount) public earlyExitAmountContracts;
-    mapping(bytes32 => uint256) public totalEarlyExitedAmounts;
+    struct OppositeOutcomeTokensInfo {
+        bool isAllowed;
+        bool isPaused; // pause to transfer the outcome tokens to owner
+        uint8 decimalsA;
+        uint8 decimalsB;
+        IGetEarlyExitAmount earlyExitAmountContract;
+        uint256 totalEarlyExitedAmount;
+    }
+
+    OppositeOutcomeTokens[] public oppositeOutcomeTokenPairs;
+    mapping(bytes32 => OppositeOutcomeTokensInfo) public allowedOppositeOutcomeTokensInfo;
 
     error VaultAssetMismatch();
     error PairAlreadyAllowed();
@@ -55,6 +64,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         vault = _vault;
         if (_vault.asset() != address(asset_)) revert VaultAssetMismatch();
         asset_.forceApprove(address(_vault), type(uint256).max);
+
+        assetDecimals = ERC20(address(asset_)).decimals();
     }
 
     function _deposit(address caller, address receiver, uint256 assets, uint256 shares) internal override {
@@ -80,73 +91,122 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         pairHash = keccak256(abi.encodePacked(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB));
     }
 
-    function _hashTokenInfo(OppositeOutcomeTokensInfo memory tokenInfo) internal pure returns (bytes32 pairHash) {
-        pairHash = keccak256(abi.encodePacked(tokenInfo.outcomeTokenA, tokenInfo.outcomeIdA, tokenInfo.outcomeTokenB, tokenInfo.outcomeIdB));
+    function _hashTokenInfo(OppositeOutcomeTokens memory tokenInfo) internal pure returns (bytes32 pairHash) {
+        pairHash = keccak256(
+            abi.encodePacked(
+                tokenInfo.outcomeTokenA, tokenInfo.outcomeIdA, tokenInfo.outcomeTokenB, tokenInfo.outcomeIdB
+            )
+        );
     }
 
+    function convertFromAssetsToOutcomeTokenAmount(
+        uint256 assets,
+        uint8 outcomeTokenDecimals
+    ) public view returns (uint256) {
+        if(assetDecimals >= outcomeTokenDecimals) {
+            // round up in favor of the protocol
+            return Math.ceilDiv(assets, 10**(assetDecimals - outcomeTokenDecimals));
+        } else {
+            return assets * (10**(outcomeTokenDecimals - assetDecimals));
+        }
+    }
+
+    // here the amount will be in the asset decimals
+    // we will convert it into the outcome token decimals using the owner provided decimals while adding the pair
     function earlyExit(
         IERC1155 outcomeTokenA,
         uint256 outcomeIdA,
         IERC1155 outcomeTokenB,
         uint256 outcomeIdB,
-        uint256 amount,
+        uint256 amount, //amount in assets decimals 
         address to
     ) external {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
-        require(isAllowedOppositeOutcomeTokenPair[pairHash], "Not an allowed opposite outcome token pair");
+
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Not an allowed opposite outcome token pair");
+        require(!info.isPaused, "Transfers are paused for this pair");
 
         // Transfer outcome tokens from the caller to this contract
-        outcomeTokenA.safeTransferFrom(msg.sender, address(this), outcomeIdA, amount, "");
-        outcomeTokenB.safeTransferFrom(msg.sender, address(this), outcomeIdB, amount, "");
+        outcomeTokenA.safeTransferFrom(msg.sender, address(this), outcomeIdA, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsA), "");
+        outcomeTokenB.safeTransferFrom(msg.sender, address(this), outcomeIdB, convertFromAssetsToOutcomeTokenAmount(amount, info.decimalsB), "");
 
-        uint256 exitAmount = earlyExitAmountContracts[pairHash].getEarlyExitAmount(
-            outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount
-        );
+        uint256 exitAmount = info.earlyExitAmountContract
+        .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
 
         vault.withdraw(exitAmount, to, address(this));
-        totalEarlyExitedAmounts[pairHash] += exitAmount;
+        info.totalEarlyExitedAmount += exitAmount;
     }
 
     // the owner needs to make sure that the decimals of the outcome tokens are the same as the asset decimals
     // for ERC1155 tokens, the data is in the URI, so there is no way to enforce this on-chain
     function addAllowedOppositeOutcomeTokens(
         IERC1155 outcomeTokenA,
+        uint8 decimalsA,
         uint256 outcomeIdA,
         IERC1155 outcomeTokenB,
+        uint8 decimalsB,
         uint256 outcomeIdB,
         IGetEarlyExitAmount earlyExitAmountContract
     ) external onlyOwner {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
-        require(!isAllowedOppositeOutcomeTokenPair[pairHash], PairAlreadyAllowed());
+        OppositeOutcomeTokensInfo memory info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(!info.isAllowed, PairAlreadyAllowed());
 
-        allowedOppositeOutcomeTokens.push(
-            OppositeOutcomeTokensInfo({
+        allowedOppositeOutcomeTokensInfo[pairHash] = OppositeOutcomeTokensInfo({
+            isAllowed: true,
+            isPaused: false,
+            decimalsA: decimalsA,
+            decimalsB: decimalsB,
+            earlyExitAmountContract: earlyExitAmountContract,
+            totalEarlyExitedAmount: 0
+        });
+
+        oppositeOutcomeTokenPairs.push(
+            OppositeOutcomeTokens({
                 outcomeTokenA: outcomeTokenA,
                 outcomeIdA: outcomeIdA,
                 outcomeTokenB: outcomeTokenB,
                 outcomeIdB: outcomeIdB
             })
         );
-        isAllowedOppositeOutcomeTokenPair[pairHash] = true;
-        earlyExitAmountContracts[pairHash] = earlyExitAmountContract;
     }
 
-    function removeAllowedOppositeOutcomeTokens(uint256 index) external onlyOwner {
-        require(index < allowedOppositeOutcomeTokens.length, "Index out of bounds");
+    function removeAllowedOppositeOutcomeTokens(
+        IERC1155 outcomeTokenA,
+        uint256 outcomeIdA,
+        IERC1155 outcomeTokenB,
+        uint256 outcomeIdB
+    ) public onlyOwner {
+        bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Pair not allowed");
+        require(info.totalEarlyExitedAmount == 0, "Cannot remove pair with pending exited amount");
+        require(!info.isPaused, "Cannot remove pair while paused");
 
-        OppositeOutcomeTokensInfo memory tokenInfo = allowedOppositeOutcomeTokens[index];
-        bytes32 pairHash = _hashTokenInfo(tokenInfo);
-        isAllowedOppositeOutcomeTokenPair[pairHash] = false;
-        delete earlyExitAmountContracts[pairHash];
-
-        allowedOppositeOutcomeTokens[index] = allowedOppositeOutcomeTokens[allowedOppositeOutcomeTokens.length - 1];
-        allowedOppositeOutcomeTokens.pop();
+        delete allowedOppositeOutcomeTokensInfo[pairHash];
     }
 
     // make sure the owner does this only after the corresponding market has expired
     // right now it is upto the owner to verify that the market has expired
-    function transferTokensToAdmin(IERC1155 outcomeToken, uint256 outcomeId) external onlyOwner {
-        outcomeToken.safeTransferFrom(address(this), msg.sender, outcomeId, outcomeToken.balanceOf(address(this), outcomeId), "");
+    function transferTokensToAdmin(
+        IERC1155 outcomeTokenA,
+        uint256 outcomeIdA,
+        IERC1155 outcomeTokenB,
+        uint256 outcomeIdB
+    ) external onlyOwner {
+        bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Pair not allowed");
+        require(!info.isPaused, "Transfers are paused for this pair");
+        info.isPaused = true;
+
+        outcomeTokenA.safeTransferFrom(
+            address(this), msg.sender, outcomeIdA, outcomeTokenA.balanceOf(address(this), outcomeIdA), ""
+        );
+        outcomeTokenB.safeTransferFrom(
+            address(this), msg.sender, outcomeIdB, outcomeTokenB.balanceOf(address(this), outcomeIdB), ""
+        );
     }
 
     // this can be automated using a contract
@@ -158,16 +218,20 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         IERC1155 outcomeTokenB,
         uint256 outcomeIdB,
         uint256 amount
-    ) external onlyOwner {
+    ) public onlyOwner {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
-        uint256 totalExited = totalEarlyExitedAmounts[pairHash];
+        OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
+        require(info.isAllowed, "Pair not allowed");
+        require(info.isPaused, "Not paused");
+
+        uint256 totalExited = info.totalEarlyExitedAmount;
 
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
         vault.deposit(amount, address(this));
-        
+
         int256 profitOrLoss;
 
-        if(amount > totalExited) {
+        if (amount > totalExited) {
             // forge-lint: disable-next-line(unsafe-typecast)
             profitOrLoss = int256(amount - totalExited);
         } else {
@@ -178,7 +242,19 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         // forge-lint: disable-next-line(unsafe-typecast)
         _totalAssets = uint256(int256(_totalAssets) + profitOrLoss);
 
-        delete totalEarlyExitedAmounts[pairHash];
+        info.totalEarlyExitedAmount = 0;
+        info.isPaused = false;
+    }
+
+    function reportProfitOrLossAndRemovePair(
+        IERC1155 outcomeTokenA,
+        uint256 outcomeIdA,
+        IERC1155 outcomeTokenB,
+        uint256 outcomeIdB,
+        uint256 amount
+    ) external onlyOwner {
+        reportProfitOrLoss(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount);
+        removeAllowedOppositeOutcomeTokens(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
     }
 
     function checkIsAllowedOppositeOutcomeTokenPair(
@@ -188,7 +264,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdB
     ) external view returns (bool) {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
-        return isAllowedOppositeOutcomeTokenPair[pairHash];
+        return
+            allowedOppositeOutcomeTokensInfo[pairHash].isAllowed && !allowedOppositeOutcomeTokensInfo[pairHash].isPaused;
     }
 
     function totalAssets() public view override returns (uint256) {

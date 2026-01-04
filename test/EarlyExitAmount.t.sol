@@ -29,12 +29,12 @@ contract EarlyExitAmountTest is Test {
     function testGetEarlyExitAmount() public view {
         uint256 amount = 1000;
         uint256 remainingTime = marketExpiryTime - block.timestamp;
-        uint256 expectedFee = Math.mulDiv(amount, expectedApy * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
+        uint256 expectedFee =
+            Math.mulDiv(amount, expectedApy * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
         uint256 expectedExitAmount = amount - expectedFee;
 
-        uint256 exitAmount = earlyExitAmount.getEarlyExitAmount(
-            IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount
-        );
+        uint256 exitAmount =
+            earlyExitAmount.getEarlyExitAmount(IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount);
         assertEq(exitAmount, expectedExitAmount);
     }
 
@@ -45,22 +45,20 @@ contract EarlyExitAmountTest is Test {
     }
 
     function testFactoryCreate() public {
-        EarlyExitAmountBasedOnFixedAPY newContract = factory.createEarlyExitAmountContract(
-            marketExpiryTime + 100, 1000
-        );
+        EarlyExitAmountBasedOnFixedAPY newContract = factory.createEarlyExitAmountContract(marketExpiryTime + 100, 1000);
         assertEq(newContract.MARKET_EXPIRY_TIME(), marketExpiryTime + 100);
         assertEq(newContract.EXPECTED_APY(), 1000);
     }
 
     function testFuzzGetEarlyExitAmount(uint256 amount) public view {
         vm.assume(amount > 0 && amount < 1e18);
-        uint256 exitAmount = earlyExitAmount.getEarlyExitAmount(
-            IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount
-        );
+        uint256 exitAmount =
+            earlyExitAmount.getEarlyExitAmount(IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount);
         assertLe(exitAmount, amount);
         // Check that fee is correctly calculated
         uint256 remainingTime = marketExpiryTime - block.timestamp;
-        uint256 expectedFee = Math.mulDiv(amount, expectedApy * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
+        uint256 expectedFee =
+            Math.mulDiv(amount, expectedApy * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
         assertEq(exitAmount, amount - expectedFee);
     }
 }
