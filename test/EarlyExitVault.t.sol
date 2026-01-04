@@ -57,11 +57,18 @@ contract EarlyExitVaultTest is Test {
     }
 
     function testDeposit() public {
+        uint256 userBalanceBefore = asset.balanceOf(user);
+        uint256 totalAssetsBefore = vault.totalAssets();
+
         vm.startPrank(user);
         asset.approve(address(vault), 1000);
         uint256 shares = vault.deposit(1000, user);
         assertEq(shares, 1000); // Assuming 1:1 for simplicity
         assertEq(vault.totalAssets(), 1000);
+
+        // Check balances
+        assertEq(asset.balanceOf(user), userBalanceBefore - 1000);
+        assertEq(vault.totalAssets(), totalAssetsBefore + 1000);
         vm.stopPrank();
     }
 
@@ -69,9 +76,17 @@ contract EarlyExitVaultTest is Test {
         vm.startPrank(user);
         asset.approve(address(vault), 1000);
         vault.deposit(1000, user);
+
+        uint256 userBalanceBeforeWithdraw = asset.balanceOf(user);
+        uint256 totalAssetsBeforeWithdraw = vault.totalAssets();
+
         uint256 assets = vault.withdraw(500, user, user);
         assertEq(assets, 500);
         assertEq(vault.totalAssets(), 500);
+
+        // Check balances
+        assertEq(asset.balanceOf(user), userBalanceBeforeWithdraw + 500);
+        assertEq(vault.totalAssets(), totalAssetsBeforeWithdraw - 500);
         vm.stopPrank();
     }
 
@@ -93,8 +108,27 @@ contract EarlyExitVaultTest is Test {
         asset.approve(address(vault), 1000);
         vault.deposit(1000, user);
 
+        // Record balances before early exit
+        uint256 userAssetBefore = asset.balanceOf(user);
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 userTokenABefore = tokenA.balanceOf(user, outcomeIdA);
+        uint256 userTokenBBefore = tokenB.balanceOf(user, outcomeIdB);
+        uint256 vaultTokenABefore = tokenA.balanceOf(address(vault), outcomeIdA);
+        uint256 vaultTokenBBefore = tokenB.balanceOf(address(vault), outcomeIdB);
+
         vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user);
-        // Check balances, etc.
+
+        // Check balances after early exit
+        // User loses outcome tokens (100 each, rounded up)
+        assertEq(tokenA.balanceOf(user, outcomeIdA), userTokenABefore - 100);
+        assertEq(tokenB.balanceOf(user, outcomeIdB), userTokenBBefore - 100);
+        // Vault gains outcome tokens
+        assertEq(tokenA.balanceOf(address(vault), outcomeIdA), vaultTokenABefore + 100);
+        assertEq(tokenB.balanceOf(address(vault), outcomeIdB), vaultTokenBBefore + 100);
+        // User gains assets (100 from early exit)
+        assertEq(asset.balanceOf(user), userAssetBefore + 100);
+        // Total assets remain the same (early exited amount + vault assets)
+        assertEq(vault.totalAssets(), totalAssetsBefore);
         vm.stopPrank();
     }
 
@@ -269,8 +303,28 @@ contract EarlyExitVaultTest is Test {
 
         // Now split: provide assets back, get outcome tokens
         vm.startPrank(user);
+        // Record balances before split
+        uint256 userAssetBeforeSplit = asset.balanceOf(user);
+        uint256 totalAssetsBeforeSplit = vault.totalAssets();
+        uint256 userTokenABeforeSplit = tokenA.balanceOf(user, outcomeIdA);
+        uint256 userTokenBBeforeSplit = tokenB.balanceOf(user, outcomeIdB);
+        uint256 vaultTokenABeforeSplit = tokenA.balanceOf(address(vault), outcomeIdA);
+        uint256 vaultTokenBBeforeSplit = tokenB.balanceOf(address(vault), outcomeIdB);
+
         asset.approve(address(vault), 50); // split 50
         vault.splitOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, 50, user);
+
+        // Check balances after split
+        // User loses assets (50)
+        assertEq(asset.balanceOf(user), userAssetBeforeSplit - 50);
+        // Total assets remain the same
+        assertEq(vault.totalAssets(), totalAssetsBeforeSplit);
+        // User gains outcome tokens (50 each, rounded down)
+        assertEq(tokenA.balanceOf(user, outcomeIdA), userTokenABeforeSplit + 50);
+        assertEq(tokenB.balanceOf(user, outcomeIdB), userTokenBBeforeSplit + 50);
+        // Vault loses outcome tokens
+        assertEq(tokenA.balanceOf(address(vault), outcomeIdA), vaultTokenABeforeSplit - 50);
+        assertEq(tokenB.balanceOf(address(vault), outcomeIdB), vaultTokenBBeforeSplit - 50);
         vm.stopPrank();
 
         // Check that earlyExitedAmount decreased
