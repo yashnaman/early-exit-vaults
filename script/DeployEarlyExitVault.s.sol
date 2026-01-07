@@ -22,8 +22,7 @@ contract DeployEarlyExitVault is Script {
         IERC4626 underlyingVault = IERC4626(underlyingVaultAddress);
 
         EarlyExitVault earlyExitVault = new EarlyExitVault(asset, underlyingVault, vaultName, vaultSymbol);
-        EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory =
-            new EarlyExitAmountFactoryBasedOnFixedAPY();
+        EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory = new EarlyExitAmountFactoryBasedOnFixedAPY();
 
         vm.stopBroadcast();
 

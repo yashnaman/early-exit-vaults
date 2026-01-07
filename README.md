@@ -18,6 +18,7 @@ https://book.getfoundry.sh/
 ### Build
 
 ```shell
+$ npm install
 $ forge build
 ```
 

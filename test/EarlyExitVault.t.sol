@@ -176,7 +176,7 @@ contract EarlyExitVaultTest is Test {
         vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB); // pause the pair
         uint256 totalEarlyExitedBeforeReport = vault.totalEarlyExitedAmount();
         bytes32 pairHash = keccak256(abi.encodePacked(tokenA, outcomeIdA, tokenB, outcomeIdB));
-        
+
         asset.approve(address(vault), 50); // report 50, which is less than 100, so loss
         vault.reportProfitOrLoss(tokenA, outcomeIdA, tokenB, outcomeIdB, 50);
         // Check early exited amounts reset to 0
@@ -352,7 +352,9 @@ contract EarlyExitVaultTest is Test {
     function testGetOppositeOutcomeTokenPairs() public {
         vm.startPrank(owner);
         vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
-        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA + 1, tokenB, 6, outcomeIdB + 1, earlyExitAmountContract);
+        vault.addAllowedOppositeOutcomeTokens(
+            tokenA, 6, outcomeIdA + 1, tokenB, 6, outcomeIdB + 1, earlyExitAmountContract
+        );
         vm.stopPrank();
 
         // Get pairs from index 0 to 1
