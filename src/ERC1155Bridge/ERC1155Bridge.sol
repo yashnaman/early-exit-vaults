@@ -10,16 +10,17 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {AddressToString, StringToAddress} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressString.sol";
 
-// Contract definition and name
 abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
-    // Three state variables that can be accessed by any function in the contract
+
+    error InvalidSourceChain(string provided, string expected);
+    error InvalidSourceAddress(address provided, address expected);
+    error InvalidTokenSender(address provided, address expected);
+
     string public destinationChain;
     address public immutable DESTINATION_ERC1155_TOKEN;
 
-    // State variable that can only be set during contract deployment and is immutable after that
     IERC1155 public immutable SOURCE_ERC1155_TOKEN;
 
-    // Contract constructor function gets called when the contract is first deployed
     constructor(
         address _gateway,
         address _sourceErc1155Token,
@@ -33,7 +34,6 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
 
     function _execute(uint256[] memory tokenIds, uint256[] memory amounts, address to) internal virtual;
 
-    // Handles calls created by setAndSend. Updates this contract's value
     function _execute(
         bytes32,
         /*commandId*/
@@ -45,15 +45,16 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         override
     {
         
-        //gateway.validateContractCall(commandId, sourceChain_, sourceAddress_, payload_); will make sure destination chain and address are correct
+        // gateway.validateContractCall(commandId, sourceChain_, sourceAddress_, payload_); will make sure destination chain and address are correct
         // we make sure source chain and address are correct
         require(
             keccak256(bytes(sourceChain_)) == keccak256(bytes(destinationChain)),
-            "Invalid source chain"
+            InvalidSourceChain(sourceChain_, destinationChain)
         );
+        address sourceAddr = StringToAddress.toAddress(sourceAddress_);
         require(
-           StringToAddress.toAddress(sourceAddress_) == DESTINATION_ERC1155_TOKEN,
-            "Invalid source address"
+            sourceAddr == DESTINATION_ERC1155_TOKEN,
+            InvalidSourceAddress(sourceAddr, DESTINATION_ERC1155_TOKEN)
         );
         (address to, uint256[] memory tokenIds, uint256[] memory amounts) =
             abi.decode(payload_, (address, uint256[], uint256[]));
@@ -74,7 +75,10 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         returns (bytes4)
     {
         // caller should be SOURCE_ERC1155_TOKEN
-        require(msg.sender == address(SOURCE_ERC1155_TOKEN), "Invalid token sender");
+        require(
+            msg.sender == address(SOURCE_ERC1155_TOKEN),
+            InvalidTokenSender(msg.sender, address(SOURCE_ERC1155_TOKEN))
+        );
 
         //by default, the bridged tokens are sent to the `from` address
         //if data contains a 20-byte address, use that as the `to` address
@@ -98,7 +102,10 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         uint256[] calldata amounts,
         bytes calldata data
     ) external override returns (bytes4) {
-        require(msg.sender == address(SOURCE_ERC1155_TOKEN), "Invalid token sender");
+        require(
+            msg.sender == address(SOURCE_ERC1155_TOKEN),
+            InvalidTokenSender(msg.sender, address(SOURCE_ERC1155_TOKEN))
+        );
         address to = data.length == 20 ? abi.decode(data, (address)) : from;
         bridgeERC1155Tokens(to, tokenIds, amounts);
 
