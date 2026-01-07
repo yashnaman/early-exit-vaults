@@ -431,6 +431,10 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         return result;
     }
 
+    function getOppositeOutcomeTokenPairsLength() external view returns (uint256) {
+        return oppositeOutcomeTokenPairs.length;
+    }
+
     function totalAssets() public view override returns (uint256) {
         return totalEarlyExitedAmount + vault.previewRedeem(vault.balanceOf(address(this)));
     }
