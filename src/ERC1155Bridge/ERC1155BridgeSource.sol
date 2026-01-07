@@ -9,7 +9,7 @@ contract ERC1155BridgeSource is ERC1155Bridge {
     constructor(
         address _gateway,
         address _sourceErc1155Token,
-        string memory _destinationErc1155Token,
+        address _destinationErc1155Token,
         string memory _sourceChain,
         string memory _destinationChain
     ) ERC1155Bridge(_gateway, _sourceErc1155Token, _destinationErc1155Token, _sourceChain, _destinationChain) {}
