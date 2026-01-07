@@ -8,12 +8,11 @@ import {IERC1155Receiver} from "@openzeppelin/contracts/interfaces/IERC1155Recei
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import { AddressToString } from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressString.sol";
+import {AddressToString} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressString.sol";
 
 // Contract definition and name
 abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
     // Three state variables that can be accessed by any function in the contract
-    string public sourceChain;
     string public destinationChain;
     address public immutable DESTINATION_ERC1155_TOKEN;
 
@@ -25,12 +24,10 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         address _gateway,
         address _sourceErc1155Token,
         address _destinationErc1155Token,
-        string memory _sourceChain,
         string memory _destinationChain
     ) AxelarExecutable(_gateway) {
         SOURCE_ERC1155_TOKEN = IERC1155(_sourceErc1155Token);
         DESTINATION_ERC1155_TOKEN = _destinationErc1155Token;
-        sourceChain = _sourceChain;
         destinationChain = _destinationChain;
     }
 

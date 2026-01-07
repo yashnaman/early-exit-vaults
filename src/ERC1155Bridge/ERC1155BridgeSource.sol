@@ -10,9 +10,8 @@ contract ERC1155BridgeSource is ERC1155Bridge {
         address _gateway,
         address _sourceErc1155Token,
         address _destinationErc1155Token,
-        string memory _sourceChain,
         string memory _destinationChain
-    ) ERC1155Bridge(_gateway, _sourceErc1155Token, _destinationErc1155Token, _sourceChain, _destinationChain) {}
+    ) ERC1155Bridge(_gateway, _sourceErc1155Token, _destinationErc1155Token, _destinationChain) {}
 
     function _execute(uint256[] memory tokenIds, uint256[] memory amounts, address to) internal override {
         SOURCE_ERC1155_TOKEN.safeBatchTransferFrom(address(this), to, tokenIds, amounts, "");
