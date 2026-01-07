@@ -29,11 +29,11 @@ contract DeployERC1155Bridge is Script {
     ICREATE3Factory internal constant CREATE3_FACTORY = ICREATE3Factory(0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf);
 
     string internal bnb = "binance";
-    string internal polygon = "polygon";
+    string internal Polygon = "Polygon";
 
     address internal constant OPINION_ERC1155_BSC = 0xAD1a38cEc043e70E83a3eC30443dB285ED10D774;
 
-    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault test", uint256(2)));
+    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault test", uint256(3)));
 
     function run() external {
         vm.createSelectFork(vm.envString("BSC_RPC_URL"));
@@ -44,7 +44,7 @@ contract DeployERC1155Bridge is Script {
         //     AXELAR_GATEWAY_BSC,
         //     OPINION_ERC1155_BSC,
         //     sourceAndReceiverAddresses,
-        //     polygon
+        //     Polygon
         // );
 
         // new ERC1155BridgeReceiver(
@@ -60,7 +60,7 @@ contract DeployERC1155Bridge is Script {
             SALT,
             abi.encodePacked(
                 type(ERC1155BridgeSource).creationCode,
-                abi.encode(AXELAR_GATEWAY_BSC, OPINION_ERC1155_BSC, sourceAndReceiverAddresses, polygon)
+                abi.encode(AXELAR_GATEWAY_BSC, OPINION_ERC1155_BSC, sourceAndReceiverAddresses, Polygon)
             )
         );
 
@@ -79,7 +79,7 @@ contract DeployERC1155Bridge is Script {
                 abi.encode(AXELAR_GATEWAY_POLYGON, sourceAndReceiverAddresses, bnb, "") // add the right tokenURI here
             )
         );
-        
+
         require(polygonBridgeReceiver == sourceAndReceiverAddresses, "Deployed address mismatch");
 
         vm.stopBroadcast();

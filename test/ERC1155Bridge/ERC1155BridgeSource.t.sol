@@ -13,7 +13,7 @@ contract ERC1155BridgeSourceForkTest is Test {
     address internal constant AXELAR_GATEWAY_POLYGON = 0x6f015F16De9fC8791b234eF68D486d2bF203FBA8;
 
     string internal bnb = "binance";
-    string internal polygon = "polygon";
+    string internal polygon = "Polygon";
 
     IERC1155 internal constant OPINION_ERC1155_BSC =IERC1155(0xAD1a38cEc043e70E83a3eC30443dB285ED10D774);
 
@@ -31,5 +31,36 @@ contract ERC1155BridgeSourceForkTest is Test {
         vm.startPrank(tokenIdHolder);
         OPINION_ERC1155_BSC.safeTransferFrom(tokenIdHolder, address(erc1155BridgeSource), opinionTokenId, 1, "");
         vm.stopPrank();
+    }
+
+    function test_execute_BSC() public{
+        vm.startPrank(AXELAR_GATEWAY_BSC);
+
+        // {
+//   "commandId": "0xadcd9048eb55eb037935e3466202f92cb267b58f7beef6a561c7b741a009cb4b",
+//   "sourceChain": "Polygon",
+//   "sourceAddress": "0x33b9c567B0F6E295b5a1e79CfCd783C51AECdb67",
+//   "payload": "0x0000000000000000000000008a7f538b6f6bdab69edd0e311aeda9214bc5384a000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001a176c555d7a00a57f8edd76caf6c6c5a1fae20febf7103855c7eb974a064c88e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000"
+// }
+
+//   function execute(
+//         bytes32 commandId,
+//         string calldata sourceChain,
+//         string calldata sourceAddress,
+//         bytes calldata payload
+//     ) external virtual {
+
+    bytes32 commandId = 0xadcd9048eb55eb037935e3466202f92cb267b58f7beef6a561c7b741a009cb4b;
+    string memory sourceChain = "Polygon";
+    string memory sourceAddress = "0x33b9c567B0F6E295b5a1e79CfCd783C51AECdb67";
+    bytes memory payload = hex"0000000000000000000000008a7f538b6f6bdab69edd0e311aeda9214bc5384a000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001a176c555d7a00a57f8edd76caf6c6c5a1fae20febf7103855c7eb974a064c88e00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000";
+        
+
+        ERC1155BridgeSource(0x33b9c567B0F6E295b5a1e79CfCd783C51AECdb67).execute(
+            commandId,
+            sourceChain,
+            sourceAddress,
+            payload
+        );
     }
 }
