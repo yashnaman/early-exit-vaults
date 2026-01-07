@@ -8,7 +8,7 @@ import {IERC1155Receiver} from "@openzeppelin/contracts/interfaces/IERC1155Recei
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import {AddressToString} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressString.sol";
+import {AddressToString, StringToAddress} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/libs/AddressString.sol";
 
 // Contract definition and name
 abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
@@ -37,18 +37,24 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
     function _execute(
         bytes32,
         /*commandId*/
-        string calldata,
-        /*sourceChain_*/
-        string calldata,
-        /*sourceAddress_*/
+        string calldata sourceChain_,
+        string calldata sourceAddress_,
         bytes calldata payload_
     )
         internal
         override
     {
-        // make sure source chain and address are correct
-        //gateway.validateContractCall(commandId, sourceChain_, sourceAddress_, payload_); should be enough in verifying that
-        // source chain , source address and payload are correct
+        
+        //gateway.validateContractCall(commandId, sourceChain_, sourceAddress_, payload_); will make sure destination chain and address are correct
+        // we make sure source chain and address are correct
+        require(
+            keccak256(bytes(sourceChain_)) == keccak256(bytes(destinationChain)),
+            "Invalid source chain"
+        );
+        require(
+           StringToAddress.toAddress(sourceAddress_) == DESTINATION_ERC1155_TOKEN,
+            "Invalid source address"
+        );
         (address to, uint256[] memory tokenIds, uint256[] memory amounts) =
             abi.decode(payload_, (address, uint256[], uint256[]));
         _execute(tokenIds, amounts, to);
