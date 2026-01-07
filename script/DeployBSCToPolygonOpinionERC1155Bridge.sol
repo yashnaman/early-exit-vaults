@@ -33,7 +33,7 @@ contract DeployERC1155Bridge is Script {
 
     address internal constant OPINION_ERC1155_BSC = 0xAD1a38cEc043e70E83a3eC30443dB285ED10D774;
 
-    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault test", uint256(3)));
+    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault beta", uint256(1)));
 
     function run() external {
         vm.createSelectFork(vm.envString("BSC_RPC_URL"));
