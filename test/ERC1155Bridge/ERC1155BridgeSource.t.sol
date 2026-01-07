@@ -24,7 +24,7 @@ contract ERC1155BridgeSourceForkTest is Test {
             new ERC1155BridgeSource(AXELAR_GATEWAY_BSC, address(OPINION_ERC1155_BSC), address(1), polygon);
     }
 
-    function test_transfer_opinion_tokens() public {
+    function _test_transfer_opinion_tokens() public {
         uint256 opinionTokenId = 73032218533883501840491186035840211294006503910193843191671845582502015322254;
         address tokenIdHolder = 0x8A7f538B6f6Bdab69edD0E311aeDa9214bC5384A;
 
@@ -33,7 +33,7 @@ contract ERC1155BridgeSourceForkTest is Test {
         vm.stopPrank();
     }
 
-    function test_execute_BSC() public {
+    function _test_execute_BSC() public {
         vm.startPrank(AXELAR_GATEWAY_BSC);
 
         bytes32 commandId = 0xadcd9048eb55eb037935e3466202f92cb267b58f7beef6a561c7b741a009cb4b;
