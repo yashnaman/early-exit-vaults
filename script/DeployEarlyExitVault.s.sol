@@ -23,7 +23,7 @@ contract DeployEarlyExitVault is Script {
         string memory vaultName = vm.envString("VAULT_NAME");
         string memory vaultSymbol = vm.envString("VAULT_SYMBOL");
 
-        bytes32 salt = keccak256(abi.encodePacked("early exit vault beta - vault", uint256(1)));
+        bytes32 salt = keccak256(abi.encodePacked("early exit vault beta - the vault", uint256(1)));
 
         vm.startBroadcast();
 
@@ -40,17 +40,17 @@ contract DeployEarlyExitVault is Script {
         address vaultAddress = CREATE3_FACTORY.deploy(
             salt,
             abi.encodePacked(
-                type(EarlyExitVault).creationCode, abi.encode(asset, underlyingVault, vaultName, vaultSymbol)
+                type(EarlyExitVault).creationCode, abi.encode(asset, underlyingVault, msg.sender, vaultName, vaultSymbol)
             )
         );
 
         EarlyExitVault earlyExitVault = EarlyExitVault(vaultAddress);
-        EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory = new EarlyExitAmountFactoryBasedOnFixedAPY();
+        // EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory = new EarlyExitAmountFactoryBasedOnFixedAPY();
 
         vm.stopBroadcast();
 
         // Log the deployed addresses
         console.log("EarlyExitVault deployed at:", vaultAddress);
-        console.log("EarlyExitAmountFactoryBasedOnFixedAPY deployed at:", address(earlyExitAmountFactory));
+        // console.log("EarlyExitAmountFactoryBasedOnFixedAPY deployed at:", address(earlyExitAmountFactory));
     }
 }

@@ -102,10 +102,10 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 amount
     );
 
-    constructor(IERC20 asset_, IERC4626 _vault, string memory name_, string memory symbol_)
+    constructor(IERC20 asset_, IERC4626 _vault, address owner_, string memory name_, string memory symbol_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
-        Ownable(msg.sender)
+        Ownable(owner_)
     {
         vault = _vault;
         if (_vault.asset() != address(asset_)) revert VaultAssetMismatch();
