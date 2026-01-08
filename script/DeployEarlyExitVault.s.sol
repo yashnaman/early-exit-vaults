@@ -40,7 +40,8 @@ contract DeployEarlyExitVault is Script {
         address vaultAddress = CREATE3_FACTORY.deploy(
             salt,
             abi.encodePacked(
-                type(EarlyExitVault).creationCode, abi.encode(asset, underlyingVault, msg.sender, vaultName, vaultSymbol)
+                type(EarlyExitVault).creationCode,
+                abi.encode(asset, underlyingVault, msg.sender, vaultName, vaultSymbol)
             )
         );
 

@@ -34,7 +34,7 @@ contract EarlyExitVaultTest is Test {
         vm.startPrank(owner);
         asset = new MockERC20("USDC", "USDC");
         underlyingVault = new MockERC4626(asset);
-        vault = new EarlyExitVault(asset, underlyingVault, "Early Exit Vault", "EEV");
+        vault = new EarlyExitVault(asset, underlyingVault, owner, "Early Exit Vault", "EEV");
 
         tokenA = new MockERC1155();
         tokenB = new MockERC1155();
