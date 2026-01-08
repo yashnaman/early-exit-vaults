@@ -125,7 +125,7 @@ This completes the cycle, realizing profits/losses for the vault and depositors.
 ### Vault and Tokens
 | Name | Address/Value | Network/Notes |
 |------|---------------|---------------|
-| Early Exit Vault | 0x1cF612E083D9C7D5829d2C81006B9B11783C8324 | Polygon |
+| Early Exit Vault | 0xB9db6dD2c59291396C6d7501feA8639a52936bc5 | Polygon |
 | Early Exit Amount Factory Based on Fixed APY | 0x34F21e3b54c919E3f33A455c25DC14a01E49F35b | Polygon | 
 | Opinion Conditional Token | 0xAD1a38cEc043e70E83a3eC30443dB285ED10D774 | BSC |
 | Polymarket Conditional Token | 0x4d97dcd97ec945f40cf65f87097ace5ea0476045 | Polygon |
