@@ -18,13 +18,11 @@ contract DeployEarlyExitVault is Script {
     ICREATE3Factory internal constant CREATE3_FACTORY = ICREATE3Factory(0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf);
 
     function run() external {
-
         address assetAddress = vm.envAddress("ASSET_ADDRESS");
         address underlyingVaultAddress = vm.envAddress("UNDERLYING_VAULT_ADDRESS");
         string memory vaultName = vm.envString("VAULT_NAME");
         string memory vaultSymbol = vm.envString("VAULT_SYMBOL");
 
- 
         bytes32 salt = keccak256(abi.encodePacked("early exit vault beta - vault", uint256(1)));
 
         vm.startBroadcast();
@@ -42,8 +40,7 @@ contract DeployEarlyExitVault is Script {
         address vaultAddress = CREATE3_FACTORY.deploy(
             salt,
             abi.encodePacked(
-                type(EarlyExitVault).creationCode,
-                abi.encode(asset, underlyingVault, vaultName, vaultSymbol)
+                type(EarlyExitVault).creationCode, abi.encode(asset, underlyingVault, vaultName, vaultSymbol)
             )
         );
 
