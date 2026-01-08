@@ -7,8 +7,8 @@ remappings = [
 ]
 
 [rpc_endpoints]
-bsc = "${BSC_URL}"
-polygon = "${POLYGON_URL}"
+bsc = "${BSC_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
  
 [etherscan]
 bsc = { key = "${ETHERSCAN_API_KEY}" }
