@@ -37,11 +37,16 @@ contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
 }
 
 contract EarlyExitAmountFactoryBasedOnFixedAPY {
+    event EarlyExitAmountContractCreated(
+        uint256 indexed marketExpiryTime, uint256 indexed expectedApy, address indexed contractAddress
+    );
+
     function createEarlyExitAmountContract(uint256 marketExpiryTime, uint256 expectedApy)
         external
         returns (EarlyExitAmountBasedOnFixedAPY)
     {
         EarlyExitAmountBasedOnFixedAPY newContract = new EarlyExitAmountBasedOnFixedAPY(marketExpiryTime, expectedApy);
+        emit EarlyExitAmountContractCreated(marketExpiryTime, expectedApy, address(newContract));
         return newContract;
     }
 }
