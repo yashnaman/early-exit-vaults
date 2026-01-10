@@ -48,7 +48,8 @@ contract EarlyExitAmountTest is Test {
     }
 
     function testFactoryCreate() public {
-        EarlyExitAmountBasedOnFixedAPY newContract = factory.createEarlyExitAmountContract(marketExpiryTime + 100, 1000, 1 days);
+        EarlyExitAmountBasedOnFixedAPY newContract =
+            factory.createEarlyExitAmountContract(marketExpiryTime + 100, 1000, 1 days);
         assertEq(newContract.MARKET_EXPIRY_TIME(), marketExpiryTime + 100);
         assertEq(newContract.EXPECTED_APY(), 1000);
     }

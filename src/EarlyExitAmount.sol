@@ -14,7 +14,6 @@ contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
     uint256 public immutable EXPECTED_APY; // expressed in basis points, e.g., 500 = 5%
     uint256 public immutable FIXED_TIME_AFTER_EXPIRY; // this is the time for which user will be charged fee for exits after market expiry
 
-
     uint256 public constant BASIS_POINTS = 10_000;
     uint256 public constant SECONDS_IN_YEAR = 365 days;
 
@@ -30,7 +29,8 @@ contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
         returns (uint256)
     {
         uint256 currentTime = block.timestamp;
-        uint256 remainingTime = currentTime > MARKET_EXPIRY_TIME ? FIXED_TIME_AFTER_EXPIRY : MARKET_EXPIRY_TIME - currentTime;
+        uint256 remainingTime =
+            currentTime > MARKET_EXPIRY_TIME ? FIXED_TIME_AFTER_EXPIRY : MARKET_EXPIRY_TIME - currentTime;
         uint256 fee =
             Math.mulDiv(amount, EXPECTED_APY * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
         return amount - fee;
@@ -46,7 +46,8 @@ contract EarlyExitAmountFactoryBasedOnFixedAPY {
         external
         returns (EarlyExitAmountBasedOnFixedAPY)
     {
-        EarlyExitAmountBasedOnFixedAPY newContract = new EarlyExitAmountBasedOnFixedAPY(marketExpiryTime, expectedApy, fixedTimeAfterExpiry);
+        EarlyExitAmountBasedOnFixedAPY newContract =
+            new EarlyExitAmountBasedOnFixedAPY(marketExpiryTime, expectedApy, fixedTimeAfterExpiry);
         emit EarlyExitAmountContractCreated(marketExpiryTime, expectedApy, address(newContract));
         return newContract;
     }
