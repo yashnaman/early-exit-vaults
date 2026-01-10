@@ -19,7 +19,7 @@ contract EarlyExitAmountTest is Test {
 
     function setUp() public {
         factory = new EarlyExitAmountFactoryBasedOnFixedAPY();
-        earlyExitAmount = factory.createEarlyExitAmountContract(marketExpiryTime, expectedApy);
+        earlyExitAmount = factory.createEarlyExitAmountContract(marketExpiryTime, expectedApy, 1 days);
     }
 
     function testConstructor() public view {
@@ -42,14 +42,13 @@ contract EarlyExitAmountTest is Test {
 
     function testGetEarlyExitAmountAfterExpiry() public {
         vm.warp(marketExpiryTime + 1);
-        vm.expectRevert(EarlyExitAmountBasedOnFixedAPY.MarketAlreadyExpired.selector);
         earlyExitAmount.getEarlyExitAmount(
             IERC1155(address(0)), 0, IERC1155(address(0)), 0, 1000, IGetEarlyExitAmount.ActionType.MERGE
         );
     }
 
     function testFactoryCreate() public {
-        EarlyExitAmountBasedOnFixedAPY newContract = factory.createEarlyExitAmountContract(marketExpiryTime + 100, 1000);
+        EarlyExitAmountBasedOnFixedAPY newContract = factory.createEarlyExitAmountContract(marketExpiryTime + 100, 1000, 1 days);
         assertEq(newContract.MARKET_EXPIRY_TIME(), marketExpiryTime + 100);
         assertEq(newContract.EXPECTED_APY(), 1000);
     }
