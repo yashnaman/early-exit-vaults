@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EarlyExitAmountBasedOnFixedAPY, EarlyExitAmountFactoryBasedOnFixedAPY} from "src/EarlyExitAmount.sol";
+import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
 
 contract EarlyExitAmountTest is Test {
     EarlyExitAmountBasedOnFixedAPY earlyExitAmount;
@@ -33,15 +34,18 @@ contract EarlyExitAmountTest is Test {
             Math.mulDiv(amount, expectedApy * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);
         uint256 expectedExitAmount = amount - expectedFee;
 
-        uint256 exitAmount =
-            earlyExitAmount.getEarlyExitAmount(IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount);
+        uint256 exitAmount = earlyExitAmount.getEarlyExitAmount(
+            IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount, IGetEarlyExitAmount.ActionType.MERGE
+        );
         assertEq(exitAmount, expectedExitAmount);
     }
 
     function testGetEarlyExitAmountAfterExpiry() public {
         vm.warp(marketExpiryTime + 1);
         vm.expectRevert(EarlyExitAmountBasedOnFixedAPY.MarketAlreadyExpired.selector);
-        earlyExitAmount.getEarlyExitAmount(IERC1155(address(0)), 0, IERC1155(address(0)), 0, 1000);
+        earlyExitAmount.getEarlyExitAmount(
+            IERC1155(address(0)), 0, IERC1155(address(0)), 0, 1000, IGetEarlyExitAmount.ActionType.MERGE
+        );
     }
 
     function testFactoryCreate() public {
@@ -52,8 +56,9 @@ contract EarlyExitAmountTest is Test {
 
     function testFuzzGetEarlyExitAmount(uint256 amount) public view {
         vm.assume(amount > 0 && amount < 1e18);
-        uint256 exitAmount =
-            earlyExitAmount.getEarlyExitAmount(IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount);
+        uint256 exitAmount = earlyExitAmount.getEarlyExitAmount(
+            IERC1155(address(0)), 0, IERC1155(address(0)), 0, amount, IGetEarlyExitAmount.ActionType.SPLIT
+        );
         assertLe(exitAmount, amount);
         // Check that fee is correctly calculated
         uint256 remainingTime = marketExpiryTime - block.timestamp;

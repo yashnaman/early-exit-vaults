@@ -24,7 +24,11 @@ contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
         EXPECTED_APY = _expectedApy;
     }
 
-    function getEarlyExitAmount(IERC1155, uint256, IERC1155, uint256, uint256 amount) external view returns (uint256) {
+    function getEarlyExitAmount(IERC1155, uint256, IERC1155, uint256, uint256 amount, ActionType)
+        external
+        view
+        returns (uint256)
+    {
         uint256 currentTime = block.timestamp;
         if (currentTime >= MARKET_EXPIRY_TIME) {
             revert MarketAlreadyExpired();

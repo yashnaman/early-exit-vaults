@@ -11,7 +11,11 @@ import {MockERC1155} from "test/mocks/MockERC1155.sol";
 import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
 
 contract MockEarlyExitAmount is IGetEarlyExitAmount {
-    function getEarlyExitAmount(IERC1155, uint256, IERC1155, uint256, uint256 amount) external pure returns (uint256) {
+    function getEarlyExitAmount(IERC1155, uint256, IERC1155, uint256, uint256 amount, IGetEarlyExitAmount.ActionType)
+        external
+        pure
+        returns (uint256)
+    {
         return amount; // Return full amount for simplicity
     }
 }
