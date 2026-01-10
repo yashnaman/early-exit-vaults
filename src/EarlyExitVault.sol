@@ -32,7 +32,6 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
     uint256 constant FEE_DENOMINATOR = 10_000;
     uint256 public immutable ASSET_DECIMALS;
 
-
     // vault depositors will trust the admin of the vault to set these such that only opposite outcome tokens are allowed
     // one of the outcome should be guaranteed to be worth 1 when the market expires
     struct OppositeOutcomeTokens {
@@ -193,7 +192,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         );
 
         exitAmount = info.earlyExitAmountContract
-            .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.MERGE);
+            .getEarlyExitAmount(
+                outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.MERGE
+            );
 
         vault.withdraw(exitAmount, to, address(this));
         info.earlyExitedAmount += exitAmount;
@@ -212,7 +213,7 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdB,
         uint256 amount, // amount in asset decimals
         address to
-    ) external returns (uint256 outcomeTokensAmount){
+    ) external returns (uint256 outcomeTokensAmount) {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
 
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
@@ -228,11 +229,11 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         // The profit from this action will not be reported when the owner calls reportProfitOrLoss.
         // totalEarlyExitedAmount = totalEarlyExitedAmount > amount ? totalEarlyExitedAmount - amount : 0;
         // info.earlyExitedAmount = info.earlyExitedAmount > amount ? info.earlyExitedAmount - amount : 0;
-        if(info.earlyExitedAmount >= amount){
+        if (info.earlyExitedAmount >= amount) {
             info.earlyExitedAmount -= amount;
         } else {
             uint256 profit = amount - info.earlyExitedAmount;
-            uint256 feeAmount = profit * feesPercentage / FEE_DENOMINATOR;  
+            uint256 feeAmount = profit * feesPercentage / FEE_DENOMINATOR;
             _mint(owner(), previewDeposit(feeAmount));
             info.earlyExitedAmount = 0;
 
@@ -250,14 +251,24 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
 
         //use early exit amount conversion here as well
         outcomeTokensAmount = info.earlyExitAmountContract
-            .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.SPLIT);
+            .getEarlyExitAmount(
+                outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.SPLIT
+            );
 
         // Transfer opposite outcome tokens to the caller
         outcomeTokenA.safeTransferFrom(
-            address(this), to, outcomeIdA, convertFromAssetsToOutcomeTokenAmount(outcomeTokensAmount, info.decimalsA, false), ""
+            address(this),
+            to,
+            outcomeIdA,
+            convertFromAssetsToOutcomeTokenAmount(outcomeTokensAmount, info.decimalsA, false),
+            ""
         );
         outcomeTokenB.safeTransferFrom(
-            address(this), to, outcomeIdB, convertFromAssetsToOutcomeTokenAmount(outcomeTokensAmount, info.decimalsB, false), ""
+            address(this),
+            to,
+            outcomeIdB,
+            convertFromAssetsToOutcomeTokenAmount(outcomeTokensAmount, info.decimalsB, false),
+            ""
         );
 
         // Note: The profit from this split operation cannot be accurately calculated on-chain.
@@ -374,14 +385,13 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         if (amount > info.earlyExitedAmount) {
             // forge-lint: disable-next-line(unsafe-typecast)
             profitOrLoss = int256(amount - info.earlyExitedAmount);
-              // forge-lint: disable-next-line(unsafe-typecast)
+            // forge-lint: disable-next-line(unsafe-typecast)
 
             // mint fee shares to the owner
             uint256 feeAmount = uint256(profitOrLoss) * feesPercentage / FEE_DENOMINATOR;
             _mint(owner(), previewDeposit(feeAmount));
 
-
-              // forge-lint: disable-next-line(unsafe-typecast)
+            // forge-lint: disable-next-line(unsafe-typecast)
             profitOrLoss -= int256(feeAmount);
         } else {
             // forge-lint: disable-next-line(unsafe-typecast)
@@ -447,7 +457,8 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         bytes32 pairHash = _hashTokenPair(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB);
         OppositeOutcomeTokensInfo storage info = allowedOppositeOutcomeTokensInfo[pairHash];
         require(info.isAllowed, PairNotAllowed());
-        return info.earlyExitAmountContract.getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, actionType);
+        return info.earlyExitAmountContract
+            .getEarlyExitAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, actionType);
     }
 
     function estimateEarlyExitAmount(
@@ -457,7 +468,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdB,
         uint256 amount
     ) external view returns (uint256) {
-        return _estimateAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.MERGE);
+        return _estimateAmount(
+            outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.MERGE
+        );
     }
 
     function estimateSplitOppositeOutcomeTokensAmount(
@@ -467,7 +480,9 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         uint256 outcomeIdB,
         uint256 amount
     ) external view returns (uint256) {
-        return _estimateAmount(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.SPLIT);
+        return _estimateAmount(
+            outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB, amount, IGetEarlyExitAmount.ActionType.SPLIT
+        );
     }
 
     function getOppositeOutcomeTokenPairs(uint256 start, uint256 end)

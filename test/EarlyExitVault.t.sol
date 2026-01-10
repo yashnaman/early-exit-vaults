@@ -369,4 +369,61 @@ contract EarlyExitVaultTest is Test {
         assertEq(address(pairs[1].outcomeTokenA), address(tokenA));
         assertEq(pairs[1].outcomeIdA, outcomeIdA + 1);
     }
+
+    function testReportProfitOrLossWithFee() public {
+        vm.startPrank(owner);
+        vault.setFeesPercentage(500); // 5% fee
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        tokenA.setApprovalForAll(address(vault), true);
+        tokenB.setApprovalForAll(address(vault), true);
+        asset.approve(address(vault), 1000);
+        vault.deposit(1000, user);
+        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // earlyExitedAmount = 100
+        vm.stopPrank();
+
+        vm.startPrank(owner);
+        vault.startRedeemProcess(tokenA, outcomeIdA, tokenB, outcomeIdB); // pause the pair
+        uint256 ownerSharesBefore = vault.balanceOf(owner);
+        asset.approve(address(vault), 150); // report 150, profit = 50
+        vault.reportProfitOrLoss(tokenA, outcomeIdA, tokenB, outcomeIdB, 150);
+        uint256 ownerSharesAfter = vault.balanceOf(owner);
+        // Fee shares: previewDeposit(2) ≈ 1.739, truncated to 1
+        assertEq(ownerSharesAfter, ownerSharesBefore + 1);
+        vm.stopPrank();
+    }
+
+    function testSplitOppositeOutcomeTokensWithFee() public {
+        vm.startPrank(owner);
+        vault.setFeesPercentage(1000); // 10% fee
+        vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
+        vm.stopPrank();
+
+        vm.startPrank(user);
+        tokenA.setApprovalForAll(address(vault), true);
+        tokenB.setApprovalForAll(address(vault), true);
+        asset.approve(address(vault), 1000);
+        vault.deposit(1000, user);
+        vault.earlyExit(tokenA, outcomeIdA, tokenB, outcomeIdB, 100, user); // earlyExitedAmount = 100
+        vm.stopPrank();
+
+        // Now split more than earlyExitedAmount to trigger profit
+        vm.startPrank(user);
+        // Set balance directly to avoid onERC1155Received check
+        bytes32 idHashA = keccak256(abi.encode(outcomeIdA, uint256(0)));
+        bytes32 balanceSlotA = keccak256(abi.encode(address(vault), idHashA));
+        vm.store(address(tokenA), balanceSlotA, bytes32(uint256(120)));
+        bytes32 idHashB = keccak256(abi.encode(outcomeIdB, uint256(0)));
+        bytes32 balanceSlotB = keccak256(abi.encode(address(vault), idHashB));
+        vm.store(address(tokenB), balanceSlotB, bytes32(uint256(120)));
+        uint256 ownerSharesBefore = vault.balanceOf(owner);
+        asset.approve(address(vault), 120); // split 120, profit = 20
+        vault.splitOppositeOutcomeTokens(tokenA, outcomeIdA, tokenB, outcomeIdB, 120, user);
+        uint256 ownerSharesAfter = vault.balanceOf(owner);
+        // Fee shares: previewDeposit(2) ≈ 1.739, truncated to 1
+        assertEq(ownerSharesAfter, ownerSharesBefore + 1);
+        vm.stopPrank();
+    }
 }
