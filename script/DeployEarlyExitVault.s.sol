@@ -23,7 +23,7 @@ contract DeployEarlyExitVault is Script {
         string memory vaultName = vm.envString("VAULT_NAME");
         string memory vaultSymbol = vm.envString("VAULT_SYMBOL");
 
-        bytes32 salt = keccak256(abi.encodePacked("early exit vault beta-vault", uint256(1)));
+        bytes32 salt = keccak256(abi.encodePacked("early exit vault beta - vault", uint256(2)));
 
         vm.startBroadcast();
 
