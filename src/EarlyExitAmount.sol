@@ -30,9 +30,6 @@ contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
         returns (uint256)
     {
         uint256 currentTime = block.timestamp;
-        if (currentTime >= MARKET_EXPIRY_TIME) {
-            revert MarketAlreadyExpired();
-        }
         uint256 remainingTime = MARKET_EXPIRY_TIME - currentTime;
         uint256 fee =
             Math.mulDiv(amount, EXPECTED_APY * remainingTime, BASIS_POINTS * SECONDS_IN_YEAR, Math.Rounding.Ceil);

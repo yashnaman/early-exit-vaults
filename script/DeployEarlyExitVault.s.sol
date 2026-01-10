@@ -46,7 +46,7 @@ contract DeployEarlyExitVault is Script {
         );
 
         EarlyExitVault earlyExitVault = EarlyExitVault(vaultAddress);
-        // EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory = new EarlyExitAmountFactoryBasedOnFixedAPY();
+        EarlyExitAmountFactoryBasedOnFixedAPY earlyExitAmountFactory = new EarlyExitAmountFactoryBasedOnFixedAPY();
 
         vm.stopBroadcast();
 
