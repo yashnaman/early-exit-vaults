@@ -15,7 +15,7 @@ import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
- * @title EarlyExitVault
+ * @title EarlyExitVault (POKVault.xyz)
  * @dev ERC4626 tokenized vault that allows arbitragers to exit early by combining opposite
  *      allowed outcome tokens. For example, on Opinion prediction market, arbitagers can buy
  *      YES outcome token of will trump win, bridge it to Polygon, combine it with NO outcome token
