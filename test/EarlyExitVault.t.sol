@@ -220,6 +220,12 @@ contract EarlyExitVaultTest is Test {
         vm.expectRevert(EarlyExitVault.PairAlreadyAllowed.selector);
         vault.addAllowedOppositeOutcomeTokens(tokenA, 6, outcomeIdA, tokenB, 6, outcomeIdB, earlyExitAmountContract);
         vm.stopPrank();
+
+        //should also fail with reversed order
+        vm.startPrank(owner);
+        vm.expectRevert(EarlyExitVault.PairAlreadyAllowed.selector);
+        vault.addAllowedOppositeOutcomeTokens(tokenB, 6, outcomeIdB, tokenA, 6, outcomeIdA, earlyExitAmountContract);
+        vm.stopPrank();
     }
 
     function testEarlyExitNotAllowedPair() public {

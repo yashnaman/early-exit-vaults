@@ -136,7 +136,13 @@ contract EarlyExitVault is ERC4626, Ownable, ERC165, IERC1155Receiver {
         pure
         returns (bytes32 pairHash)
     {
-        pairHash = keccak256(abi.encodePacked(outcomeTokenA, outcomeIdA, outcomeTokenB, outcomeIdB));
+        (IERC1155 outcomeToken0, IERC1155 outcomeToken1, uint256 outcomeId0, uint256 outcomeId1) = address(
+                outcomeTokenA
+            ) < address(outcomeTokenB)
+            ? (outcomeTokenA, outcomeTokenB, outcomeIdA, outcomeIdB)
+            : (outcomeTokenB, outcomeTokenA, outcomeIdB, outcomeIdA);
+
+        pairHash = keccak256(abi.encodePacked(outcomeToken0, outcomeId0, outcomeToken1, outcomeId1));
     }
 
     function convertFromAssetsToOutcomeTokenAmount(uint256 assets, uint8 outcomeTokenDecimals, bool shouldRoundUp)
