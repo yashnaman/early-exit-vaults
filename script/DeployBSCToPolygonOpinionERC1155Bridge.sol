@@ -65,7 +65,7 @@ contract DeployERC1155Bridge is Script {
             SALT,
             abi.encodePacked(
                 type(ERC1155BridgeReceiver).creationCode,
-                abi.encode(AXELAR_GATEWAY_POLYGON, sourceAndReceiverAddresses, bnb, "") // add the right tokenURI here
+                abi.encode(AXELAR_GATEWAY_POLYGON, sourceAndReceiverAddresses, bnb, "https://metadata.pokvault.xyz/") // add the right tokenURI here
             )
         );
 
