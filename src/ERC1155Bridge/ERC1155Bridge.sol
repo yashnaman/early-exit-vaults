@@ -23,6 +23,10 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
 
     IERC1155 public immutable SOURCE_ERC1155_TOKEN;
 
+    //@dev "to" is the address that will receive the bridged tokens
+    event ERC1155SingleReceived(address indexed from, address indexed to, uint256 id, uint256 amount);
+    event ERC1155BatchReceived(address indexed from, address indexed to, uint256[] ids, uint256[] amounts);
+
     constructor(
         address _gateway,
         address _sourceErc1155Token,
@@ -86,6 +90,8 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
 
         bridgeERC1155Tokens(to, tokenIds, amounts);
 
+        emit ERC1155SingleReceived(from, to, tokenId, amount);
+
         return IERC1155Receiver.onERC1155Received.selector;
     }
 
@@ -102,6 +108,8 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         address to = data.length == 20 ? abi.decode(data, (address)) : from;
         bridgeERC1155Tokens(to, tokenIds, amounts);
 
+        emit ERC1155BatchReceived(from, to, tokenIds, amounts);
+        
         return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 

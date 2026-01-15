@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {ERC1155BridgeSource} from "src/ERC1155Bridge/ERC1155BridgeSource.sol";
 import {ERC1155BridgeReceiver} from "src/ERC1155Bridge/ERC1155BridgeReceiver.sol";
+import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 interface ICREATE3Factory {
     function deploy(bytes32 salt, bytes memory creationCode) external payable returns (address deployed);
@@ -21,8 +22,9 @@ contract DeployERC1155Bridge is Script {
     string internal Polygon = "Polygon";
 
     address internal constant OPINION_ERC1155_BSC = 0xAD1a38cEc043e70E83a3eC30443dB285ED10D774;
+    address internal constant POLYMARKET_ERC1155_POLYGON = 0x4D97DCd97eC945f40cF65F87097ACe5EA0476045;
 
-    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault beta", uint256(1)));
+    bytes32 constant SALT = keccak256(abi.encodePacked("early exit vault beta", uint256(2)));
 
     function run() external {
         vm.createSelectFork(vm.envString("BSC_RPC_URL"));
@@ -30,26 +32,27 @@ contract DeployERC1155Bridge is Script {
         address sourceAndReceiverAddresses = CREATE3_FACTORY.getDeployed(msg.sender, SALT);
 
         // new ERC1155BridgeSource(
-        //     AXELAR_GATEWAY_BSC,
-        //     OPINION_ERC1155_BSC,
+        //     AXELAR_GATEWAY_POLYGON,
+        //     POLYMARKET_ERC1155_POLYGON,
         //     sourceAndReceiverAddresses,
-        //     Polygon
+        //     bnb
         // );
 
         // new ERC1155BridgeReceiver(
-        //     AXELAR_GATEWAY_POLYGON,
+        //     AXELAR_GATEWAY_BSC,
         //     sourceAndReceiverAddresses,
-        //     bnb,
+        //     Polygon,
         //     ""
         // );
 
+        vm.createSelectFork(vm.envString("POLYGON_RPC_URL"));
         vm.startBroadcast();
 
         address bscBridgeSource = CREATE3_FACTORY.deploy(
             SALT,
             abi.encodePacked(
                 type(ERC1155BridgeSource).creationCode,
-                abi.encode(AXELAR_GATEWAY_BSC, OPINION_ERC1155_BSC, sourceAndReceiverAddresses, Polygon)
+                abi.encode(AXELAR_GATEWAY_POLYGON, POLYMARKET_ERC1155_POLYGON, sourceAndReceiverAddresses, bnb)
             )
         );
 
@@ -57,7 +60,7 @@ contract DeployERC1155Bridge is Script {
 
         vm.stopBroadcast();
 
-        vm.createSelectFork(vm.envString("POLYGON_RPC_URL"));
+        vm.createSelectFork(vm.envString("BSC_RPC_URL"));
 
         vm.startBroadcast();
 
@@ -65,11 +68,39 @@ contract DeployERC1155Bridge is Script {
             SALT,
             abi.encodePacked(
                 type(ERC1155BridgeReceiver).creationCode,
-                abi.encode(AXELAR_GATEWAY_POLYGON, sourceAndReceiverAddresses, bnb, "https://metadata.pokvault.xyz/") // add the right tokenURI here
+                abi.encode(AXELAR_GATEWAY_BSC, sourceAndReceiverAddresses, Polygon, "https://metadata.pokvault.xyz/")
             )
         );
 
         require(polygonBridgeReceiver == sourceAndReceiverAddresses, "Deployed address mismatch");
+         vm.stopBroadcast();
+
+
+        vm.createSelectFork(vm.envString("POLYGON_RPC_URL"));
+        vm.startBroadcast();
+
+        // safeTransferFrom
+        IERC1155(POLYMARKET_ERC1155_POLYGON).safeTransferFrom(
+            msg.sender,
+            sourceAndReceiverAddresses,
+            1,
+            0,
+            ""
+        );
+
+        uint256[] memory tokenIds = new uint256[](1);
+        uint256[] memory amounts = new uint256[](1);
+
+        tokenIds[0] = 1;
+        amounts[0] = 0;
+
+        IERC1155(POLYMARKET_ERC1155_POLYGON).safeBatchTransferFrom(
+            msg.sender,
+            sourceAndReceiverAddresses,
+            tokenIds,
+            amounts,
+            abi.encode(address(1))
+        );
 
         vm.stopBroadcast();
     }
