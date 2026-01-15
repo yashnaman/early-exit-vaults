@@ -7,6 +7,7 @@ import {IGetEarlyExitAmount} from "src/interface/IGetEarlyExitAmount.sol";
 
 /**
  * @title EarlyExitAmount
+ * @author yashnaman
  * @dev Contract that calculates the exit amount for opposite outcome token pairs
  */
 contract EarlyExitAmountBasedOnFixedAPY is IGetEarlyExitAmount {
