@@ -4,7 +4,10 @@ pragma solidity ^0.8.20;
 
 import {ERC1155Bridge} from "src/ERC1155Bridge/ERC1155Bridge.sol";
 
-// Contract definition and name
+/// @title ERC1155 Bridge Source
+/// @author @yashnaman
+/// @dev Send the source ERC1155 tokens to this contract to bridge them to the destination chain.
+/// After bridging, visit https://axelarscan.io/ with the transaction hash to pay the required gas for bridging.
 contract ERC1155BridgeSource is ERC1155Bridge {
     constructor(
         address _gateway,
