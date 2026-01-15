@@ -10,25 +10,25 @@ Currently, Early Exit Vault supports:
 
 Kalshi will be supported in the future.
 
-The vault is an ERC4626-compliant smart contract deployed on the Polygon network. The underlying token is USDC.e (the collateral used in Polymarket markets). The website for the project is going to be [pokvault.com](https://pokvault.com) (WIP).
+The vault is an ERC4626-compliant smart contract deployed on the BSC network. The underlying token is USDT (the collateral used in Opinion markets). The website for the project is going to be [pokvault.com](https://pokvault.com) (WIP).
 
 ## User Roles
 
 There are three primary user roles in the Early Exit Vault system:
 
-1. **Depositors**: Users who deposit USDC.e tokens into the vault to earn yield on their holdings. If USDC.e are not being used by arbitragers, they will be deposited into an underlying vault to earn yield. 
+1. **Depositors**: Users who deposit USDT tokens into the vault to earn yield on their holdings. If USDT are not being used by arbitragers, they will be deposited into an underlying vault to earn yield. 
 
-2. **Arbitragers**: Users who acquire opposite outcome tokens (e.g., YES on one market and NO on another) for the same event across prediction markets for less than $1 total. Normally, they must wait for both markets to expire to claim profits (as one outcome will win). With Early Exit Vault, they can exit early for slightly less than $1 in USDC.e, avoiding the wait. Arbitrages do not have to trust the owner of the contract at all.
+2. **Arbitragers**: Users who acquire opposite outcome tokens (e.g., YES on one market and NO on another) for the same event across prediction markets for less than $1 total. Normally, they must wait for both markets to expire to claim profits (as one outcome will win). With Early Exit Vault, they can exit early for slightly less than $1 in USDT, avoiding the wait. Arbitrages do not have to trust the owner of the contract at all.
 
 3. **Owner**: The administrator who configures the vault by specifying allowed pairs of opposite outcome tokens. The owner is also responsible for redeeming winnings after market expiration and reporting profits or losses back to the vault. 
 
 ## Smart Contract Details
 
-- **Deployment Network**: Polygon.
+- **Deployment Network**: BSC.
 - **Standard**: ERC4626 (vault standard for tokenized vaults).
-- **Underlying Token**: USDC.e.
-- **Outcome Tokens**: Conditional ERC1155 tokens from Polymarket (on Polygon) and Opinion (on BSC, bridged to Polygon).
-- **Bridging**: A bridge is deployed for Opinion ERC1155 tokens from BSC to Polygon using Axelar's General Message Passing (GMP) system. Bridging is initiated by sending tokens to the bridge contract, and fees can be paid by the arbitrager or anyone else.
+- **Underlying Token**: USDT.
+- **Outcome Tokens**: Conditional ERC1155 tokens from Polymarket (on Polygon, Bridged to BSC) and Opinion (on BSC).
+- **Bridging**: A bridge is deployed for Polymarket ERC1155 tokens from Polygon to BSC using Axelar's General Message Passing (GMP) system. Bridging is initiated by sending tokens to the bridge contract, and briding fees can be paid by the arbitrager or anyone else.
 - **Early Exit Discount**: Determined by an external contract (`IGetEarlyExitAmount`) provided during configuration.
 
 ## Step-by-Step Flow
@@ -40,15 +40,15 @@ There are three primary user roles in the Early Exit Vault system:
    - The owner identifies matching events across Polymarket and Opinion, e.g., "Will NVIDIA be the largest company at the end of January?"
      - Polymarket: YES outcome (ERC1155 token on Polygon, decimals: 6).
      - Opinion: NO outcome (ERC1155 token on BSC, decimals: 18).
-   - Opinion tokens are bridged to Polygon via the pre-deployed bridge (using Axelar GMP).
+   - Polymarket tokens are bridged to BSC via the pre-deployed bridge (using Axelar GMP).
    - The owner calls `addAllowedOppositeOutcomeTokens` on the vault to enable the pair:
 
      ```solidity
      function addAllowedOppositeOutcomeTokens(
-         IERC1155 outcomeTokenA,      // Polymarket ERC1155 token
+         IERC1155 outcomeTokenA,      // Bridged Polymarket ERC1155 token
          uint8 decimalsA,             // e.g., 6 for Polymarket
          uint256 outcomeIdA,          // YES outcome ID on Polymarket
-         IERC1155 outcomeTokenB,      // Bridged Opinion ERC1155 token
+         IERC1155 outcomeTokenB,      // Opinion ERC1155 token
          uint8 decimalsB,             // e.g., 18 for Opinion
          uint256 outcomeIdB,          // NO outcome ID on Opinion
          IGetEarlyExitAmount earlyExitAmountContract  // Contract for calculating early exit discount
@@ -56,11 +56,11 @@ There are three primary user roles in the Early Exit Vault system:
      ```
 
 3. **Deposits**:
-   - Depositors deposit USDC.e tokens into the vault to provide liquidity and earn yield.
+   - Depositors deposit USDT tokens into the vault to provide liquidity and earn yield.
 
 4. **Arbitrage Opportunity**:
    - An arbitrager identifies and executes an arbitrage: Buys YES on Polymarket and NO on Opinion for less than $1 total.
-   - Bridges the Opinion NO token from BSC to Polygon (send to bridge contract and pay fees).
+   - Bridges the Polymarket YES token from Polygon to BSC (send to bridge contract and pay fees).
 
 5. **Early Exit**:
    - Arbitrager estimates the exit amount using the vault's helper function:
@@ -75,7 +75,7 @@ There are three primary user roles in the Early Exit Vault system:
      ) external view returns (uint256);
      ```
 
-   - If satisfied, calls `earlyExit` to redeem for discounted USDC.e:
+   - If satisfied, calls `earlyExit` to redeem for discounted USDT:
 
      ```solidity
      function earlyExit(
@@ -84,7 +84,7 @@ There are three primary user roles in the Early Exit Vault system:
          IERC1155 outcomeTokenB,
          uint256 outcomeIdB,
          uint256 amount,  // Amount in asset decimals
-         address to       // Recipient of USDC.e
+         address to       // Recipient of USDT
      ) external returns (uint256 exitAmount);
      ```
 
@@ -101,8 +101,8 @@ There are three primary user roles in the Early Exit Vault system:
      ```
 
    - Depending on the winner:
-     - If NO (Opinion) wins: Bridge the NO tokens back to BSC and claim winnings.
-     - If YES (Polymarket) wins: Claim winnings directly on Polygon.
+     - If NO (Opinion) wins:Claim winnings directly on BSC. 
+     - If YES (Polymarket) wins: Bridge the NO tokens back to Polygon and claim winnings.
    - Winnings are bridged back if necessary.
 
 7. **Report Results**:
@@ -125,11 +125,11 @@ This completes the cycle, realizing profits/losses for the vault and depositors.
 ### Vault and Tokens
 | Name | Address/Value | Network/Notes |
 |------|---------------|---------------|
-| Early Exit Vault | 0x69362094D0C2D8Be0818c0006e09B82c5CA59Af9 | Polygon |
-| Early Exit Amount Factory Based on Fixed APY | 0xd9b4b0142da1378a86b56d96decfd383c14c811e | Polygon | 
+| Early Exit Vault | 0x5a791CCAB49931861056365eBC072653F3FA0ba0 | BSC |
+| Early Exit Amount Factory Based on Fixed APY | 0xd9b4b0142da1378a86b56d96decfd383c14c811e | BSC | 
 | Opinion Conditional Token | 0xAD1a38cEc043e70E83a3eC30443dB285ED10D774 | BSC |
 | Polymarket Conditional Token | 0x4d97dcd97ec945f40cf65f87097ace5ea0476045 | Polygon |
-| USDC.e | 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 | Polygon (underlying collateral) |
+| USDT | 0x55d398326f99059fF775485246999027B3197955 | BSC (underlying collateral) |
 
 ### Axelar Gateways and Chain Names
 | Name | Address/Value | Network/Notes |
@@ -142,8 +142,8 @@ This completes the cycle, realizing profits/losses for the vault and depositors.
 ### Opinion ERC1155 Bridges
 | Name | Address/Value | Network/Notes |
 |------|---------------|---------------|
-| Opinion ERC1155 Bridge Source | 0x4020b9d6d226aaed55b320e4d5795bf237238df6 | BSC |
-| Opinion ERC1155 Bridge Receiver | 0x4020b9d6d226aaed55b320e4d5795bf237238df6 | Polygon |
+| Polymarket ERC1155 Bridge Source | 0xB42D95Bd05713eD14369fC1a1e4fAF107b27c464 | BSC |
+| Polymarket ERC1155 Bridge Receiver | 0xB42D95Bd05713eD14369fC1a1e4fAF107b27c464 | Polygon |
 
 ## Usage
 
