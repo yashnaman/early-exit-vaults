@@ -73,20 +73,13 @@ contract DeployERC1155Bridge is Script {
         );
 
         require(polygonBridgeReceiver == sourceAndReceiverAddresses, "Deployed address mismatch");
-         vm.stopBroadcast();
-
+        vm.stopBroadcast();
 
         vm.createSelectFork(vm.envString("POLYGON_RPC_URL"));
         vm.startBroadcast();
 
         // safeTransferFrom
-        IERC1155(POLYMARKET_ERC1155_POLYGON).safeTransferFrom(
-            msg.sender,
-            sourceAndReceiverAddresses,
-            1,
-            0,
-            ""
-        );
+        IERC1155(POLYMARKET_ERC1155_POLYGON).safeTransferFrom(msg.sender, sourceAndReceiverAddresses, 1, 0, "");
 
         uint256[] memory tokenIds = new uint256[](1);
         uint256[] memory amounts = new uint256[](1);
@@ -94,13 +87,8 @@ contract DeployERC1155Bridge is Script {
         tokenIds[0] = 1;
         amounts[0] = 0;
 
-        IERC1155(POLYMARKET_ERC1155_POLYGON).safeBatchTransferFrom(
-            msg.sender,
-            sourceAndReceiverAddresses,
-            tokenIds,
-            amounts,
-            abi.encode(address(1))
-        );
+        IERC1155(POLYMARKET_ERC1155_POLYGON)
+            .safeBatchTransferFrom(msg.sender, sourceAndReceiverAddresses, tokenIds, amounts, abi.encode(address(1)));
 
         vm.stopBroadcast();
     }

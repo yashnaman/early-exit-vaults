@@ -109,7 +109,7 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         bridgeERC1155Tokens(to, tokenIds, amounts);
 
         emit ERC1155BatchReceived(from, to, tokenIds, amounts);
-        
+
         return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 
