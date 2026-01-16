@@ -79,8 +79,8 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         );
 
         //by default, the bridged tokens are sent to the `from` address
-        //if data contains a 20-byte address, use that as the `to` address
-        address to = data.length == 20 ? abi.decode(data, (address)) : from;
+        //if data contains a encoded address, use that as the `to` address
+        address to = data.length == 32 ? abi.decode(data, (address)) : from;
 
         uint256[] memory tokenIds = new uint256[](1);
         uint256[] memory amounts = new uint256[](1);
@@ -105,7 +105,7 @@ abstract contract ERC1155Bridge is AxelarExecutable, ERC165, IERC1155Receiver {
         require(
             msg.sender == address(SOURCE_ERC1155_TOKEN), InvalidTokenSender(msg.sender, address(SOURCE_ERC1155_TOKEN))
         );
-        address to = data.length == 20 ? abi.decode(data, (address)) : from;
+        address to = data.length == 32 ? abi.decode(data, (address)) : from;
         bridgeERC1155Tokens(to, tokenIds, amounts);
 
         emit ERC1155BatchReceived(from, to, tokenIds, amounts);
