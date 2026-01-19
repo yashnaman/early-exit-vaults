@@ -10,7 +10,7 @@ Currently, Early Exit Vault supports:
 
 Kalshi will be supported in the future.
 
-The vault is an ERC4626-compliant smart contract deployed on the BSC network. The underlying token is USDT (the collateral used in Opinion markets). The website for the project is going to be [pokvault.com](https://pokvault.com) (WIP).
+The vault is an ERC4626-compliant smart contract deployed on the BSC network. The underlying token is USDT (the collateral used in Opinion markets). The website for the project is going to be [POKVault.xyz](https://pokvault.xyz) (WIP).
 
 ## User Roles
 
