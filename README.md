@@ -34,7 +34,7 @@ There are three primary user roles in the Early Exit Vault system:
 ## Step-by-Step Flow
 
 1. **Vault Deployment**:
-   - The owner deploys the Early Exit Vault ERC4626 smart contract on Polygon.
+   - The owner deploys the Early Exit Vault ERC4626 smart contract on BSC.
 
 2. **Market Identification and Configuration**:
    - The owner identifies matching events across Polymarket and Opinion, e.g., "Will NVIDIA be the largest company at the end of January?"
