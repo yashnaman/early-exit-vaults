@@ -28,7 +28,7 @@ There are three primary user roles in the Early Exit Vault system:
 - **Standard**: ERC4626 (vault standard for tokenized vaults).
 - **Underlying Token**: USDT.
 - **Outcome Tokens**: Conditional ERC1155 tokens from Polymarket (on Polygon, Bridged to BSC) and Opinion (on BSC).
-- **Bridging**: A bridge is deployed for Polymarket ERC1155 tokens from Polygon to BSC using Axelar's General Message Passing (GMP) system. Bridging is initiated by sending tokens to the bridge contract, and briding fees can be paid by the arbitrager or anyone else.
+- **Bridging**: A bridge is deployed for Polymarket ERC1155 tokens from Polygon to BSC using Axelar's General Message Passing (GMP) system. Bridging is initiated by sending tokens to the bridge contract, and bridging fees can be paid by the arbitrager or anyone else.
 - **Early Exit Discount**: Determined by an external contract (`IGetEarlyExitAmount`) provided during configuration.
 
 ## Step-by-Step Flow
