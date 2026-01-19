@@ -139,7 +139,7 @@ This completes the cycle, realizing profits/losses for the vault and depositors.
 | Axelar BSC Chain Name | binance | N/A |
 | Axelar Polygon Chain Name | Polygon | N/A |
 
-### Opinion ERC1155 Bridges
+### Ploymarket ERC1155 Bridges
 | Name | Address/Value | Network/Notes |
 |------|---------------|---------------|
 | Polymarket ERC1155 Bridge Source | 0xB42D95Bd05713eD14369fC1a1e4fAF107b27c464 | BSC |
